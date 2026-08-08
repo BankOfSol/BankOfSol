@@ -49,6 +49,15 @@ SELECT 'seed-svc-working-session', 'working-session', 'Working session',
        60, 15000, 30, 15, 12, 30, 1, 1, datetime('now'), datetime('now')
 WHERE NOT EXISTS (SELECT 1 FROM "consult_service" WHERE "slug" = 'working-session');
 
+-- ⚠️ PLACEHOLDER PRICE — set your own in Admin → Bookings before promoting it.
+-- Matches the AI track on the landing page so that CTA has somewhere to land.
+INSERT INTO "consult_service"
+  ("id","slug","name","description","durationMin","priceCents","slotEveryMin","bufferMin","leadHours","maxDaysAhead","active","sortOrder","createdAt","updatedAt")
+SELECT 'seed-svc-ai-session', 'ai-session', 'AI strategy session',
+       '60 minutes on practical AI: where it helps in your business, what to automate first, or how to build your own consulting practice around it.',
+       60, 15000, 30, 15, 12, 30, 1, 2, datetime('now'), datetime('now')
+WHERE NOT EXISTS (SELECT 1 FROM "consult_service" WHERE "slug" = 'ai-session');
+
 -- ── The shop + first product ───────────────────────────────────────────────
 -- Owner resolves to the ADMIN_EMAIL account; inserts nothing until that user
 -- exists (sign up first, then re-run).

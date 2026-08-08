@@ -1,97 +1,127 @@
 import { Link } from "react-router-dom";
 import usePageMeta from "../lib/usePageMeta.js";
 
-const PILLARS = [
+// The landing page. One job: get the right person onto a call. Everything
+// else on the page exists to answer "can they build my thing?" and then get
+// out of the way — minimal sections, one primary action repeated at the top
+// and bottom.
+const SERVICES = [
   {
-    icon: "🧾",
-    title: "Membership",
-    body: "A personal account with Sol: onboarding, engagements, and every bill and payment itemized like a bank statement. Approved one at a time.",
-    to: "/membership",
-    link: "Apply for membership →",
+    n: "01",
+    title: "Web applications",
+    body: "Customer portals, dashboards, storefronts, internal tools. Designed, built, and shipped on modern edge infrastructure — the platform you're reading this on is our own work.",
   },
   {
-    icon: "🛠️",
-    title: "Consulting",
-    body: "Websites, apps, and business financial automation — scoped, built, and shipped by the same hands that built this platform.",
-    to: "/consulting",
-    link: "See services →",
+    n: "02",
+    title: "Financial automation",
+    body: "Invoicing, payments, reconciliation, reporting, and the glue between the tools you already pay for. We take the money paperwork off your desk and make it run itself.",
   },
   {
-    icon: "📅",
-    title: "Book time",
-    body: "Pick an open slot, pay, and it's confirmed on the spot — with a calendar invite in your inbox. Times shown in your timezone.",
-    to: "/book",
-    link: "See open times →",
+    n: "03",
+    title: "AI education & consulting",
+    body: "Practical AI in your business, taught in plain language: where it actually helps, what to automate first, and how to put it into production without betting the company on it.",
   },
+];
+
+const STEPS = [
+  ["Start a call", "Book a slot in a couple of clicks. We talk through what you want built and whether we're the right fit."],
+  ["Get a plan", "You leave with a clear scope, a timeline, and a number — not a vague proposal three weeks later."],
+  ["We build it", "Work runs through your member account: every engagement, invoice, and payment itemized, so you always know where things stand."],
 ];
 
 export default function Home() {
   usePageMeta({});
   return (
-    <div className="page">
-      <section className="hero">
-        <div className="hero-kicker">Private client services</div>
-        <h1>
-          The <span className="gold-grad">Bank of Sol</span>
+    <div className="page lp">
+      <section className="lp-hero">
+        <div className="lp-eyebrow">Bank of Sol</div>
+        <h1 className="lp-title">
+          We build the thing
+          <br />
+          <span className="gold-grad">you keep meaning to build.</span>
         </h1>
-        <p className="hero-sub">
-          One builder, taken seriously. Members bring the work — websites,
-          apps, financial automation — and get a running account where every
-          engagement, session, and payment is itemized with bank-statement
-          clarity.
+        <p className="lp-lede">
+          Web applications, financial automation, and AI consulting — built by
+          the people who'll actually be doing the work. Start with a call.
         </p>
-        <div className="hero-ctas">
-          <Link className="btn btn-gold" to="/membership">
-            Become a member
+        <div className="lp-actions">
+          <Link className="btn btn-gold btn-lg" to="/book">
+            Start a call
           </Link>
-          <Link className="btn btn-ghost" to="/book">
-            Book time with Sol
+          <Link className="btn btn-ghost btn-lg" to="/consulting">
+            What we do
           </Link>
+        </div>
+        <p className="lp-note">
+          Real availability, real calendar. Sessions confirm instantly and are
+          fully refundable up to 24 hours before.
+        </p>
+      </section>
+
+      <hr className="lp-rule" />
+
+      <section className="lp-section">
+        <div className="section-kicker">What we build</div>
+        <div className="service-rows">
+          {SERVICES.map((s) => (
+            <div className="service-row" key={s.n}>
+              <span className="service-index mono">{s.n}</span>
+              <div>
+                <h3>{s.title}</h3>
+                <p>{s.body}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
-      <section className="pillars">
-        {PILLARS.map((p) => (
-          <div className="card pillar" key={p.title}>
-            <span className="pillar-icon" aria-hidden>
-              {p.icon}
-            </span>
-            <h3>{p.title}</h3>
-            <p>{p.body}</p>
-            <Link className="pillar-link" to={p.to}>
-              {p.link}
-            </Link>
-          </div>
-        ))}
+      <section className="lp-band">
+        <div className="section-kicker">For people starting out in AI</div>
+        <h2>Thinking about consulting with AI yourself?</h2>
+        <p>
+          If you're early in this and want to build a real practice around it,
+          we work with a small number of people on exactly that: choosing a
+          niche, building an offer you can stand behind, setting up the tooling
+          and delivery process, and pricing the work honestly. No hype, no
+          guaranteed-income promises — just the skills and the setup, from
+          someone doing the work every day.
+        </p>
+        <p className="muted lp-band-note">
+          We're selective here on purpose, and we like working with people who
+          are serious about it. Bring your questions to a call and we'll tell
+          you straight whether we can help.
+        </p>
+        <Link className="btn btn-green" to="/book">
+          Talk it through
+        </Link>
       </section>
 
-      <section className="section">
-        <div className="section-kicker">How membership works</div>
-        <h2>Apply. Onboard. Build.</h2>
-        <div className="pillars">
-          <div className="card pillar">
-            <h3>1 · Apply</h3>
-            <p>
-              Create an account and tell Sol what you want to build. Every
-              application is reviewed personally — no automation, no queues.
-            </p>
-          </div>
-          <div className="card pillar">
-            <h3>2 · Onboard</h3>
-            <p>
-              Your engagement gets scoped into your account: what's being
-              built, what it costs, and when. Invoices arrive itemized, and
-              you pay them where you can see them.
-            </p>
-          </div>
-          <div className="card pillar">
-            <h3>3 · Build</h3>
-            <p>
-              Booked sessions, steady progress, and a ledger that always
-              matches reality. When the work ships, your review goes on the
-              record.
-            </p>
-          </div>
+      <section className="lp-section">
+        <div className="section-kicker">How it works</div>
+        <div className="lp-steps">
+          {STEPS.map(([title, body], i) => (
+            <div className="lp-step" key={title}>
+              <span className="lp-step-n mono">{i + 1}</span>
+              <h3>{title}</h3>
+              <p>{body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="lp-close">
+        <h2>Bring the idea. We'll build the thing.</h2>
+        <p>
+          The fastest way to find out if this works is a conversation. Pick a
+          time that suits you.
+        </p>
+        <div className="lp-actions">
+          <Link className="btn btn-gold btn-lg" to="/book">
+            Start a call
+          </Link>
+          <Link className="btn btn-ghost btn-lg" to="/membership">
+            Become a member
+          </Link>
         </div>
       </section>
     </div>

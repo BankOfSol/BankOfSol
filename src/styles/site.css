@@ -898,3 +898,136 @@ table.list td {
   padding: 2px 4px;
 }
 .star-btn.on { color: var(--gold); }
+
+/* ── Landing page (appended) ── */
+/* Minimal, high-air layout for the homepage. One primary action (Start a
+   call) repeated top and bottom; everything else is quiet by design. */
+
+.lp { max-width: 940px; }
+
+.lp-hero { padding: 72px 0 56px; max-width: 720px; }
+
+.lp-eyebrow {
+  color: var(--ink-dim);
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  margin-bottom: 22px;
+}
+
+.lp-title {
+  font-size: clamp(2.1rem, 6.4vw, 3.9rem);
+  line-height: 1.06;
+  letter-spacing: -0.03em;
+  margin: 0 0 22px;
+}
+
+.lp-lede {
+  color: var(--ink-dim);
+  font-size: clamp(1.02rem, 2.2vw, 1.2rem);
+  line-height: 1.6;
+  max-width: 560px;
+  margin-bottom: 30px;
+}
+
+.lp-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
+.btn-lg { padding: 15px 30px; font-size: 1.02rem; }
+
+.lp-note {
+  color: var(--ink-dim);
+  font-size: 0.86rem;
+  margin: 22px 0 0;
+  max-width: 460px;
+}
+
+.lp-rule { border: none; border-top: 1px solid var(--line); margin: 0; }
+
+.lp-section { padding: 56px 0; }
+
+/* Service rows — hairline-separated, not boxed. Reads as a list, not a grid
+   of ads. */
+.service-rows { display: flex; flex-direction: column; }
+
+.service-row {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 8px;
+  padding: 26px 0;
+  border-bottom: 1px solid var(--line);
+  align-items: start;
+}
+.service-row:last-child { border-bottom: none; }
+.service-row h3 { margin: 0 0 8px; font-size: 1.22rem; letter-spacing: -0.01em; }
+.service-row p { color: var(--ink-dim); margin: 0; max-width: 620px; }
+
+.service-index {
+  color: var(--gold);
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding-top: 5px;
+  letter-spacing: 0.04em;
+}
+
+/* The AI-practice band — a distinct audience, so it gets its own surface. */
+.lp-band {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 38px 32px;
+  margin: 16px 0;
+}
+.lp-band h2 { max-width: 620px; letter-spacing: -0.02em; }
+.lp-band p { color: var(--ink-dim); max-width: 660px; }
+.lp-band-note { font-size: 0.9rem; }
+
+.lp-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 28px;
+}
+.lp-step h3 { margin: 10px 0 6px; font-size: 1.05rem; }
+.lp-step p { color: var(--ink-dim); font-size: 0.95rem; margin: 0; }
+.lp-step-n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  color: var(--gold);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.lp-close {
+  border-top: 1px solid var(--line);
+  padding: 64px 0 24px;
+  max-width: 640px;
+}
+.lp-close h2 {
+  font-size: clamp(1.6rem, 4vw, 2.3rem);
+  letter-spacing: -0.02em;
+}
+.lp-close p { color: var(--ink-dim); margin-bottom: 26px; }
+
+@media (max-width: 560px) {
+  .lp-hero { padding: 46px 0 40px; }
+  .lp-section { padding: 40px 0; }
+  .lp-band { padding: 28px 20px; }
+  .lp-close { padding-top: 48px; }
+  .service-row { grid-template-columns: 40px 1fr; padding: 22px 0; }
+  .lp-actions .btn { flex: 1; min-width: 160px; }
+}
+
+/* The gold accent was originally scoped to `.hero`; the landing page uses
+   `.lp-hero`, so make it standalone. (The `.hero .gold-grad` rule above is
+   identical and still applies inside heroes.) */
+.gold-grad {
+  background: linear-gradient(100deg, var(--gold) 20%, var(--gold-hi) 60%, var(--gold));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
