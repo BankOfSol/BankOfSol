@@ -14,14 +14,17 @@ export async function onRequestGet({ request, env }) {
       .catch(() => 0);
 
   const nowIso = new Date().toISOString();
-  const [custodyApplied, upcomingBookings, paidOrders] = await Promise.all([
-    count(`SELECT COUNT(*) AS n FROM "custody_account" WHERE "status" = 'applied'`),
-    count(
-      `SELECT COUNT(*) AS n FROM "booking" WHERE "status" = 'paid' AND "startAt" > ?`,
-      nowIso
-    ),
-    count(`SELECT COUNT(*) AS n FROM "shop_order" WHERE "status" = 'paid'`),
-  ]);
+  const [membershipApplied, upcomingBookings, paidOrders, pendingClaims, openInvoices] =
+    await Promise.all([
+      count(`SELECT COUNT(*) AS n FROM "member_account" WHERE "status" = 'applied'`),
+      count(
+        `SELECT COUNT(*) AS n FROM "booking" WHERE "status" = 'paid' AND "startAt" > ?`,
+        nowIso
+      ),
+      count(`SELECT COUNT(*) AS n FROM "shop_order" WHERE "status" = 'paid'`),
+      count(`SELECT COUNT(*) AS n FROM "payment_claim" WHERE "status" = 'pending'`),
+      count(`SELECT COUNT(*) AS n FROM "invoice" WHERE "status" IN ('open','partial')`),
+    ]);
 
-  return json({ custodyApplied, upcomingBookings, paidOrders });
+  return json({ membershipApplied, upcomingBookings, paidOrders, pendingClaims, openInvoices });
 }

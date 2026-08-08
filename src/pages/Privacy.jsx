@@ -10,23 +10,25 @@ export default function Privacy() {
       <h3>What we collect</h3>
       <p>
         Account details you give us (name, email, password — hashed, never
-        readable), bookings and orders you place, custody applications you
-        submit, and the public Solana addresses involved in your vault. Server
-        logs include IP addresses for abuse prevention.
+        readable), bookings and orders you place, membership applications,
+        your account ledger (invoices, payments, any loans), and — when you
+        pay an invoice with a digital asset — the public transaction
+        reference you supply. Server logs include IP addresses for abuse
+        prevention.
       </p>
 
       <h3>What we don't collect</h3>
       <p>
         No advertising trackers, no analytics cookies, no selling data —
         cookies here do exactly one job: keeping you signed in. We never hold
-        your card number (Stripe processes payments) and we never hold private
-        keys — ours stay on offline hardware, and yours stay with you.
+        your card number (Stripe processes payments) and we never hold
+        private keys — yours stay with you.
       </p>
 
       <h3>Email</h3>
       <p>
         We send transactional email only: verification, receipts,
-        booking confirmations, custody decisions. Our email log stores subjects
+        booking confirmations, membership decisions. Our email log stores subjects
         and delivery outcomes, never message bodies or links.
       </p>
 
@@ -40,7 +42,7 @@ export default function Privacy() {
       <h3>Your rights</h3>
       <p>
         Email <a href="mailto:sol@bankofsol.app">sol@bankofsol.app</a> to
-        export or delete your account data. Custody records may be retained
+        export or delete your account data. Billing records may be retained
         where the law requires it.
       </p>
     </div>

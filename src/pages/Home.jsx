@@ -3,30 +3,30 @@ import usePageMeta from "../lib/usePageMeta.js";
 
 const PILLARS = [
   {
-    icon: "🏦",
-    title: "Cold-storage custody",
-    body: "Your assets held on hardware that has never touched the internet. Every vault approved personally. Every withdrawal signed by hand, offline.",
-    to: "/custody",
-    link: "Apply for a vault →",
-  },
-  {
-    icon: "💸",
-    title: "Crypto payments",
-    body: "A Stripe-style checkout for Solana. Your customers pay in SOL or USDC straight to your wallet — we never hold your funds.",
-    to: "/custody",
-    link: "Coming soon",
+    icon: "🧾",
+    title: "Membership",
+    body: "A personal account with Sol: onboarding, engagements, and every bill and payment itemized like a bank statement. Approved one at a time.",
+    to: "/membership",
+    link: "Apply for membership →",
   },
   {
     icon: "🛠️",
     title: "Consulting",
-    body: "Websites, apps, and business financial automation — built by the same hands that built this. Book paid time directly.",
+    body: "Websites, apps, and business financial automation — scoped, built, and shipped by the same hands that built this platform.",
     to: "/consulting",
     link: "See services →",
   },
   {
+    icon: "📅",
+    title: "Book time",
+    body: "Pick an open slot, pay, and it's confirmed on the spot — with a calendar invite in your inbox. Times shown in your timezone.",
+    to: "/book",
+    link: "See open times →",
+  },
+  {
     icon: "🛒",
     title: "The shop",
-    body: "Physical goods and 3D-printed products, made to order and shipped to you. Card checkout, crypto coming.",
+    body: "Physical goods and 3D-printed products, made to order and shipped to you.",
     to: "/shop",
     link: "Browse the shop →",
   },
@@ -37,19 +37,19 @@ export default function Home() {
   return (
     <div className="page">
       <section className="hero">
-        <div className="hero-kicker">Safety over everything</div>
+        <div className="hero-kicker">Private client services</div>
         <h1>
           The <span className="gold-grad">Bank of Sol</span>
         </h1>
         <p className="hero-sub">
-          Solana custody with keys that never touch the internet, crypto
-          payments for businesses, and hands-on consulting. A bank makes money
-          lending your deposits out — we don't. Your assets sit in cold
-          storage, and we earn fees for services instead.
+          One builder, taken seriously. Members bring the work — websites,
+          apps, financial automation — and get a running account where every
+          engagement, session, and payment is itemized with bank-statement
+          clarity.
         </p>
         <div className="hero-ctas">
-          <Link className="btn btn-gold" to="/custody">
-            Open a vault
+          <Link className="btn btn-gold" to="/membership">
+            Become a member
           </Link>
           <Link className="btn btn-ghost" to="/book">
             Book time with Sol
@@ -73,29 +73,30 @@ export default function Home() {
       </section>
 
       <section className="section">
-        <div className="section-kicker">How custody works</div>
-        <h2>Keys cold. Ledger live.</h2>
+        <div className="section-kicker">How membership works</div>
+        <h2>Apply. Onboard. Build.</h2>
         <div className="pillars">
           <div className="card pillar">
             <h3>1 · Apply</h3>
             <p>
-              Create an account and apply. Every custody client is reviewed and
-              approved personally — no exceptions, no automation.
+              Create an account and tell Sol what you want to build. Every
+              application is reviewed personally — no automation, no queues.
             </p>
           </div>
           <div className="card pillar">
-            <h3>2 · Deposit</h3>
+            <h3>2 · Onboard</h3>
             <p>
-              You get a dedicated Solana deposit address generated on offline
-              hardware. Deposits show up in your dashboard, verified on-chain.
+              Your engagement gets scoped into your account: what's being
+              built, what it costs, and when. Invoices arrive itemized, and
+              you pay them where you can see them.
             </p>
           </div>
           <div className="card pillar">
-            <h3>3 · Withdraw</h3>
+            <h3>3 · Build</h3>
             <p>
-              Withdrawals are requests. Each one is signed by hand on the
-              offline device, then verified on-chain before it's closed. Slow
-              by design — that's the security model.
+              Booked sessions, steady progress, and a ledger that always
+              matches reality. When the work ships, your review goes on the
+              record.
             </p>
           </div>
         </div>

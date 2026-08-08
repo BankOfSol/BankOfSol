@@ -4,8 +4,8 @@ import { signUp } from "../lib/auth-client.js";
 import usePageMeta from "../lib/usePageMeta.js";
 
 // Where to land after the verification link is clicked. `?next=` lets a funnel
-// hand the new user straight to what they came for (/custody sends them back
-// to the vault teaser). Same-origin paths only — never bounce to a foreign host.
+// hand the new user straight to what they came for (/membership sends them
+// back to the application). Same-origin paths only — never bounce to a foreign host.
 function safeNext(raw) {
   if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/dashboard";
   return raw;
@@ -13,9 +13,9 @@ function safeNext(raw) {
 
 // Copy tweaks per funnel, so the page speaks to why they clicked.
 const NEXT_COPY = {
-  "/custody": {
-    heading: "Start your vault application",
-    sub: "Create your account first — then your custody application goes straight to Sol for personal review.",
+  "/membership": {
+    heading: "Start your membership application",
+    sub: "Create your account first — then your application goes straight to Sol for personal review.",
   },
   "/book": {
     heading: "Book time with Sol",
@@ -95,7 +95,7 @@ export default function Signup() {
         <h1>{copy?.heading || "Open your account"}</h1>
         <p className="muted">
           {copy?.sub ||
-            "One account for custody applications, consulting bookings, and your orders."}
+            "One account for membership, consulting bookings, and your orders."}
         </p>
         <form onSubmit={onSubmit}>
           <div className="form-field">

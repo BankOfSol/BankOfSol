@@ -28,8 +28,8 @@ export default function Footer() {
         </div>
         <p className="footer-disclaimer">
           Bank of Sol is a technology and services company, not a chartered
-          bank or licensed depository institution. Digital assets are not FDIC
-          insured. No yield is offered or promised on custodied assets.
+          bank or licensed depository institution. Member accounts are service
+          ledgers, not deposit accounts, and are not FDIC insured.
         </p>
         <p className="footer-copy">© {new Date().getFullYear()} Bank of Sol</p>
       </div>

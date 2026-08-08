@@ -202,8 +202,8 @@ export const sendWelcomeEmail = (env, user) =>
   send(env, user.email, {
     subject: "Your Bank of Sol account is live",
     heading: "You're verified.",
-    bodyHtml: `<p>Your account is active. From your dashboard you can book consulting time, track orders, and apply for a custody vault — every vault is approved personally by Sol.</p>`,
-    bodyText: "Your account is active. From your dashboard you can book consulting time, track orders, and apply for a custody vault — every vault is approved personally by Sol.",
+    bodyHtml: `<p>Your account is active. From your dashboard you can book consulting time, track orders, and apply for membership — every member is approved personally by Sol.</p>`,
+    bodyText: "Your account is active. From your dashboard you can book consulting time, track orders, and apply for membership — every member is approved personally by Sol.",
     cta: { label: "Open dashboard", url: `${env.BETTER_AUTH_URL || "https://bankofsol.app"}/dashboard` },
     accent: GREEN,
   }, { kind: "welcome" });
@@ -298,33 +298,82 @@ export function sendBookingReminder(env, booking) {
   }, { kind: "booking-reminder", note: booking.refCode });
 }
 
-// ── Custody templates ───────────────────────────────────────────────────────
+// ── Membership templates ────────────────────────────────────────────────────
 
-export const sendCustodyApplied = (env, user) =>
+export const sendMembershipApplied = (env, user) =>
   send(env, user.email, {
-    subject: "Custody application received — Bank of Sol",
+    subject: "Membership application received — Bank of Sol",
     heading: "Application received.",
-    bodyHtml: `<p>Thanks, ${escapeHtml(firstName(user))} — your custody application is in the queue. Every vault is reviewed and approved personally by Sol; you'll hear back at this address.</p>`,
-    bodyText: "Your custody application is in the queue. Every vault is reviewed and approved personally by Sol; you'll hear back at this address.",
-  }, { kind: "custody-applied" });
+    bodyHtml: `<p>Thanks, ${escapeHtml(firstName(user))} — your membership application is in the queue. Every member is reviewed and approved personally by Sol; you'll hear back at this address.</p>`,
+    bodyText: "Your membership application is in the queue. Every member is reviewed and approved personally by Sol; you'll hear back at this address.",
+  }, { kind: "membership-applied" });
 
-export function sendCustodyDecision(env, user, status) {
+export function sendMembershipDecision(env, user, status) {
   const approved = status === "approved";
   return send(env, user.email, {
     subject: approved
-      ? "Your Bank of Sol vault is approved"
-      : "Your custody application — Bank of Sol",
+      ? "Welcome to Bank of Sol — you're a member"
+      : "Your membership application — Bank of Sol",
     heading: approved ? "You're in." : "About your application",
     bodyHtml: approved
-      ? `<p>Sol approved your custody application. Vault onboarding opens from your dashboard — you'll be walked through your deposit address and how withdrawals work (every withdrawal is signed offline, by hand).</p>`
-      : `<p>Your custody application wasn't approved this time. You can reply to this email if you'd like to talk it through.</p>`,
+      ? `<p>Sol approved your membership. Your account is open — book time, follow your engagements, and see every bill and payment itemized on your account page.</p>`
+      : `<p>Your membership application wasn't approved this time. You can reply to this email if you'd like to talk it through.</p>`,
     bodyText: approved
-      ? "Sol approved your custody application. Vault onboarding opens from your dashboard."
-      : "Your custody application wasn't approved this time. Reply to this email if you'd like to talk it through.",
+      ? "Sol approved your membership. Your account is open — book time, follow your engagements, and see every bill and payment itemized on your account page."
+      : "Your membership application wasn't approved this time. Reply to this email if you'd like to talk it through.",
     ...(approved
-      ? { cta: { label: "Open your vault", url: `${env.BETTER_AUTH_URL || "https://bankofsol.app"}/custody` }, accent: GREEN }
+      ? { cta: { label: "Open your account", url: `${env.BETTER_AUTH_URL || "https://bankofsol.app"}/billing` }, accent: GREEN }
       : {}),
-  }, { kind: "custody-decision", note: status });
+  }, { kind: "membership-decision", note: status });
+}
+
+// ── Billing templates ───────────────────────────────────────────────────────
+
+const usd = (cents) => `$${(Math.trunc(cents) / 100).toFixed(2)}`;
+
+export function sendInvoiceOpened(env, member, invoice) {
+  const site = env.SITE_URL || env.BETTER_AUTH_URL || "https://bankofsol.app";
+  return send(env, member.email, {
+    subject: `Invoice ${invoice.refCode}: ${invoice.title} — ${usd(invoice.totalCents)}`,
+    heading: "You have a new invoice.",
+    bodyHtml: `<p><strong>${escapeHtml(invoice.title)}</strong><br>
+      ${escapeHtml(invoice.refCode)} · <strong>${usd(invoice.totalCents)}</strong>${invoice.dueDate ? ` · due ${escapeHtml(invoice.dueDate)}` : ""}</p>
+      <p>Pay by card or crypto from your account page — every line item is listed there.</p>`,
+    bodyText: `${invoice.title}\n${invoice.refCode} · ${usd(invoice.totalCents)}${invoice.dueDate ? ` · due ${invoice.dueDate}` : ""}\nPay by card or crypto from your account page.`,
+    cta: { label: "View & pay", url: `${site}/billing` },
+  }, { kind: "invoice-open", note: invoice.refCode });
+}
+
+export function sendPaymentReceived(env, member, invoice, amountCents, status) {
+  return send(env, member.email, {
+    subject: `Payment received — ${invoice.refCode} ${status === "paid" ? "is paid in full" : `(${usd(amountCents)})`}`,
+    heading: status === "paid" ? "Paid in full. Thank you." : "Payment received.",
+    bodyHtml: `<p><strong>${usd(amountCents)}</strong> received on <strong>${escapeHtml(invoice.refCode)}</strong> — ${escapeHtml(invoice.title)}.</p>
+      ${status === "paid" ? "<p>This invoice is settled.</p>" : `<p>Remaining balance shows on your account page.</p>`}`,
+    bodyText: `${usd(amountCents)} received on ${invoice.refCode} — ${invoice.title}. ${status === "paid" ? "This invoice is settled." : "Remaining balance shows on your account page."}`,
+    accent: GREEN,
+  }, { kind: "payment-received", note: invoice.refCode });
+}
+
+export function sendClaimNotice(env, claim, invoice, member) {
+  return send(env, env.ADMIN_EMAIL, {
+    subject: `Crypto payment claim: ${invoice.refCode} via ${claim.chain}`,
+    heading: "A member says they paid.",
+    bodyHtml: `<p><strong>${escapeHtml(member.name || member.email)}</strong> claims a <strong>${claim.chain}</strong> payment on <strong>${escapeHtml(invoice.refCode)}</strong> (${escapeHtml(invoice.title)}, ${usd(invoice.totalCents - invoice.paidCents)} outstanding).</p>
+      ${claim.txRef ? `<p>Reference: <span style="word-break:break-all;">${escapeHtml(claim.txRef)}</span></p>` : ""}
+      <p>Verify it on-chain, then confirm or reject from Admin → Members.</p>`,
+    bodyText: `${member.name || member.email} claims a ${claim.chain} payment on ${invoice.refCode} (${usd(invoice.totalCents - invoice.paidCents)} outstanding).${claim.txRef ? `\nReference: ${claim.txRef}` : ""}\nVerify on-chain, then confirm or reject from Admin → Members.`,
+  }, { kind: "claim-notice", note: invoice.refCode });
+}
+
+export function sendLoanDueNotice(env, member, loan) {
+  return send(env, member.email, {
+    subject: `Monthly loan payment due — ${loan.refCode}`,
+    heading: "Loan payment due.",
+    bodyHtml: `<p>Your monthly payment${loan.monthlyDueCents ? ` of <strong>${usd(loan.monthlyDueCents)}</strong>` : ""} on loan <strong>${escapeHtml(loan.refCode)}</strong> is due. Your running balance is itemized on your account page.</p>`,
+    bodyText: `Your monthly payment${loan.monthlyDueCents ? ` of ${usd(loan.monthlyDueCents)}` : ""} on loan ${loan.refCode} is due. Your running balance is itemized on your account page.`,
+    cta: { label: "Open your account", url: `${env.SITE_URL || env.BETTER_AUTH_URL || "https://bankofsol.app"}/billing` },
+  }, { kind: "loan-due", note: loan.refCode });
 }
 
 // ── Shop / admin notices ────────────────────────────────────────────────────

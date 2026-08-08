@@ -32,7 +32,7 @@ export async function requireUser(env, request) {
 }
 
 // Signed in AND email verified — for actions where the contact address must be
-// provably real (custody applications, merchant registration).
+// provably real (membership applications).
 export async function requireVerifiedUser(env, request) {
   const gate = await requireUser(env, request);
   if (gate.error) return gate;
@@ -53,7 +53,7 @@ export async function requireAdmin(env, request) {
 }
 
 // The single super admin (SUPER_ADMIN_EMAIL / ADMIN_EMAIL). Manages other
-// admins and the custody address registry; regular admins get a 403 here.
+// admins and the crypto payment rails; regular admins get a 403 here.
 export async function requireSuperAdmin(env, request) {
   const user = await getSessionUser(env, request);
   if (!user) return { error: error(401, "Not signed in") };
@@ -61,20 +61,20 @@ export async function requireSuperAdmin(env, request) {
   return { user };
 }
 
-// Approved custody client (or admin). Guards the vault endpoints (Phase 3);
-// the application/status endpoints stay on requireUser so a pending applicant
-// can always see where they stand.
-export async function requireCustodyClient(env, request) {
+// Approved member (or admin). Guards the billing/account endpoints; the
+// application/status endpoints stay on requireUser so a pending applicant can
+// always see where they stand.
+export async function requireMember(env, request) {
   const gate = await requireUser(env, request);
   if (gate.error) return gate;
   if (gate.user.isAdmin) return gate;
   const row = await env.DB.prepare(
-    `SELECT 1 FROM "custody_account" WHERE "userId" = ? AND "status" = 'approved'`
+    `SELECT 1 FROM "member_account" WHERE "userId" = ? AND "status" = 'approved'`
   )
     .bind(gate.user.id)
     .first();
   if (!row) {
-    return { error: error(403, "Custody clients only — apply for a vault first.") };
+    return { error: error(403, "Members only — apply for membership first.") };
   }
   return gate;
 }

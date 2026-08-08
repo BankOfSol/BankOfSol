@@ -884,3 +884,17 @@ table.list td {
   border-top: 1px solid var(--line);
 }
 .crop-zoom { width: auto; flex: 1; }
+
+/* ── Billing components (appended) ── */
+
+/* Star picker (ReviewSheet) + star display (admin reviews) */
+.star-btn {
+  background: none;
+  border: none;
+  font-size: 1.9rem;
+  line-height: 1;
+  color: var(--ink-dim);
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.star-btn.on { color: var(--gold); }

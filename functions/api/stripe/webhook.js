@@ -5,6 +5,7 @@ import {
   sendBookingConfirmed,
   sendBookingNotification,
 } from "../../lib/email.js";
+import { recordInvoicePayment } from "../../lib/ledger.js";
 
 // POST /api/stripe/webhook — the one endpoint Stripe calls for everything we
 // sell. No session auth: the HMAC signature IS the auth (STRIPE_WEBHOOK_SECRET,
@@ -91,6 +92,32 @@ const HANDLERS = {
         .bind(nowIso(), session.id)
         .run();
     }
+  },
+
+  bos_invoice: async (env, event, session) => {
+    // Invoices have no pending row to expire — the checkout session is
+    // stateless against the invoice, so only 'completed' matters here.
+    if (event.type !== "checkout.session.completed" || session.payment_status !== "paid") {
+      return;
+    }
+    const invoice = await env.DB.prepare(`SELECT * FROM "invoice" WHERE "id" = ?`)
+      .bind(String(session.metadata.invoiceId || ""))
+      .first();
+    if (!invoice) return;
+    // The /api/billing/confirm fallback races us; the session id is the
+    // idempotency key — whoever writes the ledger entry first wins.
+    const already = await env.DB.prepare(
+      `SELECT 1 FROM "ledger_entry" WHERE "kind" = 'payment' AND "reference" = ?`
+    )
+      .bind(session.id)
+      .first();
+    if (already) return;
+    const amountCents = parseInt(session.metadata.amountCents, 10) || session.amount_total;
+    await recordInvoicePayment(env, invoice, amountCents, {
+      method: "stripe",
+      reference: session.id,
+      createdBy: "stripe",
+    });
   },
 };
 

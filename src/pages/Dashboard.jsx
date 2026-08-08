@@ -6,9 +6,9 @@ import { fmtUsd } from "../lib/money.js";
 import VerifyBanner from "../components/VerifyBanner.jsx";
 import usePageMeta from "../lib/usePageMeta.js";
 
-const CUSTODY_BADGE = {
+const MEMBER_BADGE = {
   applied: ["badge-gold", "Application pending"],
-  approved: ["badge-green", "Approved"],
+  approved: ["badge-green", "Member"],
   rejected: ["badge-red", "Not approved"],
   suspended: ["badge-red", "Suspended"],
   closed: ["badge", "Closed"],
@@ -28,7 +28,7 @@ function fmtWhen(iso, tz) {
 
 export default function Dashboard() {
   usePageMeta({ title: "Dashboard" });
-  const { me, custody } = useMe();
+  const { me, membership } = useMe();
   const [bookings, setBookings] = useState(null);
   const [orders, setOrders] = useState(null);
 
@@ -40,9 +40,9 @@ export default function Dashboard() {
   const upcoming = (bookings || []).filter(
     (b) => b.status === "paid" && new Date(b.startAt) > new Date()
   );
-  const [custodyBadgeClass, custodyBadgeText] = custody
-    ? CUSTODY_BADGE[custody.status] || ["badge", custody.status]
-    : ["badge", "No vault yet"];
+  const [memberBadgeClass, memberBadgeText] = membership
+    ? MEMBER_BADGE[membership.status] || ["badge", membership.status]
+    : ["badge", "Not a member yet"];
 
   return (
     <div className="page">
@@ -64,51 +64,50 @@ export default function Dashboard() {
       <VerifyBanner />
 
       <div className="pillars" style={{ marginTop: 0 }}>
-        {/* Vault status — the financial-dashboard heart. Real balances arrive
-            with the Phase 3 vault; until then this card is the state machine. */}
+        {/* Membership + billing — the financial heart of the dashboard. */}
         <div className="card pillar">
           <div className="spread">
-            <h3>🏦 Custody vault</h3>
-            <span className={`badge ${custodyBadgeClass}`}>{custodyBadgeText}</span>
+            <h3>🧾 Your account</h3>
+            <span className={`badge ${memberBadgeClass}`}>{memberBadgeText}</span>
           </div>
-          {!custody && (
+          {!membership && (
             <>
               <p>
-                Cold-storage custody for your Solana assets. Apply and Sol
-                reviews it personally.
+                Membership gets you an itemized account: engagements, invoices,
+                and payments, tracked like a bank statement.
               </p>
-              <Link className="pillar-link" to="/custody">
-                Apply for a vault →
+              <Link className="pillar-link" to="/membership">
+                Apply for membership →
               </Link>
             </>
           )}
-          {custody?.status === "applied" && (
+          {membership?.status === "applied" && (
             <>
               <p>
                 Your application is in the queue. You'll get an email the
                 moment Sol decides — most reviews happen within a day.
               </p>
-              <Link className="pillar-link" to="/custody">
+              <Link className="pillar-link" to="/membership">
                 See where you stand →
               </Link>
             </>
           )}
-          {custody?.status === "approved" && (
+          {membership?.status === "approved" && (
             <>
               <p>
-                You're approved. Vault onboarding opens shortly — Sol will
-                reach out with your dedicated deposit address.
+                Your ledger, invoices, engagements, and payment options live on
+                your account page.
               </p>
-              <Link className="pillar-link" to="/custody">
-                Open your vault →
+              <Link className="pillar-link" to="/billing">
+                Open your account →
               </Link>
             </>
           )}
-          {(custody?.status === "rejected" ||
-            custody?.status === "suspended" ||
-            custody?.status === "closed") && (
+          {(membership?.status === "rejected" ||
+            membership?.status === "suspended" ||
+            membership?.status === "closed") && (
             <p className="muted">
-              Questions about your application? Reply to the decision email and
+              Questions about your membership? Reply to the decision email and
               a real person answers.
             </p>
           )}

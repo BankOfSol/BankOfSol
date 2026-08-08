@@ -6,10 +6,10 @@ import {
   str,
   logAdminActivity,
 } from "../../../lib/util.js";
-import { sendCustodyDecision } from "../../../lib/email.js";
+import { sendMembershipDecision } from "../../../lib/email.js";
 
-// POST /api/admin/custody/decide {id, action, note} — approve/reject an
-// application, or suspend/close an approved account. Emails the applicant on
+// POST /api/admin/membership/decide {id, action, note} — approve/reject an
+// application, or suspend/close an approved member. Emails the applicant on
 // approve/reject; every decision is logged.
 const ACTIONS = {
   approve: { from: ["applied", "suspended"], to: "approved", email: true },
@@ -35,8 +35,8 @@ export async function onRequestPost({ request, env }) {
   if (!action) return error(400, "action must be approve, reject, suspend, or close");
 
   const row = await env.DB.prepare(
-    `SELECT ca.*, u."email", u."name" FROM "custody_account" ca
-      JOIN "user" u ON u."id" = ca."userId" WHERE ca."id" = ?`
+    `SELECT ma.*, u."email", u."name" FROM "member_account" ma
+      JOIN "user" u ON u."id" = ma."userId" WHERE ma."id" = ?`
   )
     .bind(id)
     .first();
@@ -47,7 +47,7 @@ export async function onRequestPost({ request, env }) {
 
   const now = nowIso();
   await env.DB.prepare(
-    `UPDATE "custody_account"
+    `UPDATE "member_account"
         SET "status" = ?, "adminNote" = COALESCE(?, "adminNote"),
             "decidedAt" = ?, "decidedBy" = ?, "updatedAt" = ?
       WHERE "id" = ?`
@@ -56,10 +56,10 @@ export async function onRequestPost({ request, env }) {
     .run();
 
   if (action.email) {
-    await sendCustodyDecision(env, { email: row.email, name: row.name }, action.to);
+    await sendMembershipDecision(env, { email: row.email, name: row.name }, action.to);
   }
 
-  await logAdminActivity(env, gate.user, `custody.${body.action}`, {
+  await logAdminActivity(env, gate.user, `membership.${body.action}`, {
     id,
     userEmail: row.email,
   });

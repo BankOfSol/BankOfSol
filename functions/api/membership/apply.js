@@ -1,9 +1,10 @@
 import { requireVerifiedUser, json, error, nowIso, str, clientIp } from "../../lib/util.js";
-import { sendCustodyApplied } from "../../lib/email.js";
+import { sendMembershipApplied } from "../../lib/email.js";
 
-// POST /api/custody/apply {motivation} — one application per user (UNIQUE on
-// userId), verified email required: the waitlist is only worth anything if
-// every address on it is real. Approval is Sol's alone, from the admin queue.
+// POST /api/membership/apply {motivation} — one application per user (UNIQUE
+// on userId), verified email required: the member list is only worth anything
+// if every address on it is real. Approval is Sol's alone, from the admin
+// queue.
 export async function onRequestPost({ request, env }) {
   const gate = await requireVerifiedUser(env, request);
   if (gate.error) return gate.error;
@@ -21,9 +22,9 @@ export async function onRequestPost({ request, env }) {
   if (ip) {
     const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
     const n = await env.DB.prepare(
-      `SELECT COUNT(*) AS n FROM "custody_account" ca
-        JOIN "session" s ON s."userId" = ca."userId"
-       WHERE s."ipAddress" = ? AND ca."appliedAt" >= ?`
+      `SELECT COUNT(*) AS n FROM "member_account" ma
+        JOIN "session" s ON s."userId" = ma."userId"
+       WHERE s."ipAddress" = ? AND ma."appliedAt" >= ?`
     )
       .bind(ip, since)
       .first()
@@ -34,7 +35,7 @@ export async function onRequestPost({ request, env }) {
   }
 
   const existing = await env.DB.prepare(
-    `SELECT "status" FROM "custody_account" WHERE "userId" = ?`
+    `SELECT "status" FROM "member_account" WHERE "userId" = ?`
   )
     .bind(gate.user.id)
     .first();
@@ -44,7 +45,7 @@ export async function onRequestPost({ request, env }) {
 
   const now = nowIso();
   await env.DB.prepare(
-    `INSERT INTO "custody_account"
+    `INSERT INTO "member_account"
        ("id","userId","status","motivation","appliedAt","createdAt","updatedAt")
      VALUES (?,?,'applied',?,?,?,?)`
   )
@@ -58,6 +59,6 @@ export async function onRequestPost({ request, env }) {
     )
     .run();
 
-  await sendCustodyApplied(env, gate.user);
+  await sendMembershipApplied(env, gate.user);
   return json({ ok: true, status: "applied", appliedAt: now }, { status: 201 });
 }

@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMe } from "../lib/me-context.jsx";
 import { api } from "../lib/api.js";
-import CustodyQueueAdmin from "../components/CustodyQueueAdmin.jsx";
+import AdminMembers from "../components/AdminMembers.jsx";
+import MembershipQueueAdmin from "../components/MembershipQueueAdmin.jsx";
 import BookingAdmin from "../components/BookingAdmin.jsx";
 import AvailabilityEditor from "../components/AvailabilityEditor.jsx";
 import usePageMeta from "../lib/usePageMeta.js";
@@ -53,7 +54,8 @@ function EmailLog() {
 }
 
 const TABS = [
-  { key: "custody", label: "🏦 Custody" },
+  { key: "members", label: "👥 Members" },
+  { key: "applications", label: "📨 Applications" },
   { key: "bookings", label: "📅 Bookings" },
   { key: "availability", label: "🗓 Availability" },
   { key: "shop", label: "🛒 Shop" },
@@ -63,7 +65,7 @@ const TABS = [
 export default function Admin() {
   usePageMeta({ title: "Admin" });
   const { me } = useMe();
-  const [tab, setTab] = useState("custody");
+  const [tab, setTab] = useState("members");
   const [counts, setCounts] = useState({});
 
   const loadCounts = () => {
@@ -84,7 +86,8 @@ export default function Admin() {
   }
 
   const badge = {
-    custody: counts.custodyApplied,
+    members: counts.pendingClaims,
+    applications: counts.membershipApplied,
     bookings: counts.upcomingBookings,
     shop: counts.paidOrders,
   };
@@ -113,7 +116,8 @@ export default function Admin() {
         ))}
       </div>
 
-      {tab === "custody" && <CustodyQueueAdmin onChanged={loadCounts} />}
+      {tab === "members" && <AdminMembers onChanged={loadCounts} />}
+      {tab === "applications" && <MembershipQueueAdmin onChanged={loadCounts} />}
       {tab === "bookings" && <BookingAdmin onChanged={loadCounts} />}
       {tab === "availability" && <AvailabilityEditor />}
       {tab === "shop" && (

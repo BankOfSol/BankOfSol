@@ -37,7 +37,7 @@ export default function Login() {
     <div className="page">
       <div className="panel narrow">
         <h1>Log in</h1>
-        <p className="muted">Welcome back to the vault.</p>
+        <p className="muted">Welcome back.</p>
         <form onSubmit={onSubmit}>
           <div className="form-field">
             <label htmlFor="email">

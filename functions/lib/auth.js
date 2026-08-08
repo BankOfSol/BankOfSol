@@ -52,7 +52,7 @@ export function getAuth(env) {
     ],
     // Email verification is a HARD gate: you cannot sign in until you've
     // confirmed your address (requireEmailVerification below). Unverified
-    // accounts never get a session — the custody waitlist starts from a
+    // accounts never get a session — the membership waitlist starts from a
     // provably real address.
     emailVerification: {
       sendOnSignUp: true,

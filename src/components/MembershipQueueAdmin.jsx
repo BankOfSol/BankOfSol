@@ -3,7 +3,7 @@ import { api } from "../lib/api.js";
 
 const FILTERS = ["applied", "approved", "rejected", "all"];
 
-export default function CustodyQueueAdmin({ onChanged }) {
+export default function MembershipQueueAdmin({ onChanged }) {
   const [filter, setFilter] = useState("applied");
   const [rows, setRows] = useState(null);
   const [busyId, setBusyId] = useState(null);
@@ -12,7 +12,7 @@ export default function CustodyQueueAdmin({ onChanged }) {
   const load = (f = filter) => {
     setRows(null);
     api
-      .adminCustodyQueue(f)
+      .adminMembershipQueue(f)
       .then((d) => setRows(d.applications || []))
       .catch((e) => {
         setErr(e.message);
@@ -29,7 +29,7 @@ export default function CustodyQueueAdmin({ onChanged }) {
     setBusyId(id);
     setErr("");
     try {
-      await api.adminCustodyDecide(id, action, note);
+      await api.adminMembershipDecide(id, action, note);
       load();
       onChanged?.();
     } catch (e) {

@@ -77,9 +77,19 @@ ADMIN_EMAIL (paid orders / bookings / custody applications; silent when empty).
   `availability_exception` (closed = whole-day blackout, open = extra window),
   `booking` (UTC instants, `buyerTz` for rendering, `icsToken` UNIQUE = calendar/cancel
   key, `reminderSentAt`).
-- **0004 custody waitlist**: `custody_account` (userId UNIQUE, status
-  applied|approved|rejected|suspended|closed, decidedBy/At). Phase 3 adds vault tables
-  (0006) + merchant checkout (0007) per the build plan.
+- **0004 custody waitlist** (renamed by 0005): userId UNIQUE, status
+  applied|approved|rejected|suspended|closed, decidedBy/At.
+- **0005 member ledger (the pivot)**: `custody_account` → **`member_account`** (same
+  lifecycle, honest name). New: `ledger_entry` (**signed** amountCents — + member
+  owes, − credit; balance = SUM; kinds invoice|payment|loan_disbursement|loan_due
+  (amount-0 monthly marker)|loan_payment|adjustment|refund), `invoice` +
+  `invoice_item` (draft→open posts the ledger charge; only drafts editable; void
+  books a reversing adjustment), `loan` (disbursement posts +principal; monthly
+  dueDay 1–28 tracked by the daily cron with amount-0 markers + emails; forgiven
+  books off the remainder), `payment_claim` (crypto intents — the ledger only moves
+  when Sol CONFIRMS a claim with its USD value), `crypto_rail` (XRP/SOL/BTC/TON
+  RECEIVING addresses, superadmin-only, public addresses ever), `engagement`
+  (onboarding pipeline), `review` (one per completed booking).
 
 Money is integer cents everywhere; `parseFloat` is banned in money files. Slots are
 computed on request, never materialized; the atomic primitive is the guarded
@@ -111,10 +121,22 @@ middleware. Admin mutations all `logAdminActivity`.
 | GET `/api/booking/ics/[token]` | unguessable token | hand-written RFC 5545 VEVENT (paid/completed only) |
 | GET `/api/booking/mine` | user | my bookings (includes icsToken — caller's own) |
 | `/api/admin/booking/{services,availability,list,action}` | admin | service CRUD, rules+exceptions editor, list, complete/cancel(+refund)/meeting-link |
-| POST `/api/custody/apply` | verified user | one application per user (UNIQUE); emails confirmation |
-| GET `/api/custody/status` | user | drives the locked-overlay progress tracker |
-| `/api/admin/custody/{queue,decide}` | admin | FIFO queue; approve/reject/suspend/close (emails on approve/reject) |
-| GET `/api/admin/counts` · `/api/admin/email-log` | admin | tab badges; outbound-mail ledger |
+| POST `/api/membership/apply` | verified user | one application per user (UNIQUE); emails confirmation |
+| GET `/api/membership/status` | user | drives the locked-overlay progress tracker |
+| `/api/admin/membership/{queue,decide}` | admin | FIFO queue; approve/reject/suspend/close (emails on approve/reject) |
+| GET `/api/billing` | member | the whole account: balance, itemized ledger, invoices+items, loans, engagements, active rails, reviewable bookings |
+| POST `/api/billing/invoices/[id]/pay` | member (owner, 404) | Stripe checkout for the OUTSTANDING amount (kind `bos_invoice`) |
+| POST `/api/billing/invoices/[id]/claim` | member (owner) | file a crypto payment claim {chain, txRef}; one pending per invoice |
+| POST `/api/billing/confirm` | public (cs_ id) | Stripe fallback; session id is the idempotency key vs the webhook |
+| GET/POST `/api/reviews` | user | post-consulting review (own completed bookings, one each) |
+| GET `/api/admin/members` · `/[id]` | admin | member list w/ balances/claims badges; full member file |
+| POST `/api/admin/members/invoice` | admin | save draft / open (posts ledger) / void (reversing entry) |
+| POST `/api/admin/members/payment` | admin | record payment (any method) or signed adjustment (note required) |
+| POST `/api/admin/members/loan` | admin | create (disbursement entry) / payment / status (forgiven books off remainder) |
+| POST `/api/admin/members/engagement` | admin | onboarding pipeline CRUD |
+| GET/POST `/api/admin/members/claims` | admin | pending crypto claims; confirm (with USD value → ledger) / reject |
+| GET/POST/DELETE `/api/superadmin/rails` | superadmin | XRP/SOL/BTC/TON receiving addresses (public only, sanitizer refuses key-shaped input) |
+| GET `/api/admin/counts` · `/api/admin/email-log` | admin | tab badges (incl. pendingClaims/membershipApplied); outbound-mail ledger |
 | `/api/superadmin/{admins,activity}` | superadmin | grant/revoke isAdmin (isSuperAdmin NEVER grantable); audit feed |
 
 ## 5 · Auth & roles
@@ -144,16 +166,21 @@ Sender is locked to `sol@bankofsol.app` by the mailer's `allowed_sender_addresse
 
 ## 7 · Safety invariants (non-negotiable)
 
-1. **No private keys or seed material anywhere** — code, DB, env, logs, docs. Custody
-   is watch-only: the Phase-3 registry stores PUBLIC keys only (validated 32-byte
-   base58); withdrawals are tickets fulfilled by offline signing + on-chain
-   verification.
+1. **No private keys or seed material anywhere** — code, DB, env, logs, docs. The
+   crypto payment rails store RECEIVING addresses only (public, superadmin-only);
+   the sanitizer refuses anything key- or seed-shaped.
 2. Never copy from `/Users/sol/AI MAIN/APPS/BankOfSol` (old CDP server-wallet
    experiment; its `.env`/`wallet_data.txt` are off-limits).
-3. `DemoVaultPreview` takes NO data props — demo figures come only from its exported
-   `DEMO_VAULT` constant, with structural labeling (PREVIEW ribbon, watermark, ·DEMO
-   chips, no-yield footer). No APY/yield language anywhere.
-4. Client assets are never lent/staked; revenue is fees for services.
+3. `DemoAccountPreview` takes NO data props — demo figures come only from its
+   exported `DEMO_ACCOUNT` constant, with structural labeling (PREVIEW ribbon,
+   watermark, ·DEMO chips, simulated-preview footer). No APY/yield language.
+4. **The public site stays crypto-free** — the front recruits members; crypto is a
+   payment method inside /billing, never marketing. (Internal framing, not stated
+   publicly: bankofsol.app is the platform through which money flows to/from Sol.)
+5. **The ledger is facts, claims are intents.** Balance truth is
+   SUM(ledger_entry.amountCents) and nothing else; crypto claims only touch the
+   ledger when Sol confirms them; voids/forgiveness book REVERSING entries, never
+   deletions.
 
 ## 8 · Roadmap
 
@@ -165,6 +192,15 @@ Solana Pay merchant checkout (raw JSON-RPC, no SDK). Full plan:
 
 ## Changelog
 
+- **2026-08-08** — **The pivot: member platform + billing ledger.** Public site
+  de-crypto'd (custody/vault marketing removed; /custody 301s to /membership;
+  meta/JSON-LD/Terms/Privacy/footer rewritten — front recruits members, crypto
+  lives behind the login as a payment method). `custody_account`→`member_account`;
+  new banking core (0005): signed ledger, invoices+items, XRP/SOL/BTC/TON payment
+  rails with claim-confirm flow, loans with monthly cron tracking, engagements,
+  reviews. New surfaces: /membership, /billing (member account page), Admin →
+  Members (full account management), SuperAdmin → Payment rails. Stripe webhook
+  gains `bos_invoice`. Gates: requireCustodyClient→requireMember.
 - **2026-08-08** — **Production verified end-to-end.** `BETTER_AUTH_SECRET` set; Sol's
   admin account created and email-verified through the REAL mail path (email_log:
   verify ok=1 → welcome ok=1), confirming Worker → service binding → mailer →

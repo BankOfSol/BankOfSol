@@ -6,6 +6,7 @@
 import {
   sendAdminNotice,
   sendBookingReminder,
+  sendLoanDueNotice,
 } from "./email.js";
 
 const dayAgo = () => new Date(Date.now() - 24 * 3600 * 1000).toISOString();
@@ -21,7 +22,7 @@ async function rows(env, sql, ...binds) {
 }
 
 // ── Daily digest to Sol ─────────────────────────────────────────────────────
-// New paid orders, paid bookings, and custody applications from the last 24h.
+// New paid orders, paid bookings, and membership applications from the last 24h.
 // Silent when there's nothing — an empty digest trains the reader to ignore it.
 async function sendDailyDigest(env) {
   const since = dayAgo();
@@ -39,15 +40,27 @@ async function sendDailyDigest(env) {
   );
   const applications = await rows(
     env,
-    `SELECT ca."appliedAt", u."email" FROM "custody_account" ca
-      JOIN "user" u ON u."id" = ca."userId"
-      WHERE ca."status" = 'applied' AND ca."appliedAt" > ?`,
+    `SELECT ma."appliedAt", u."email" FROM "member_account" ma
+      JOIN "user" u ON u."id" = ma."userId"
+      WHERE ma."status" = 'applied' AND ma."appliedAt" > ?`,
     since
   );
+  const claims = await rows(
+    env,
+    `SELECT pc."chain", pc."createdAt", i."refCode", u."email"
+       FROM "payment_claim" pc
+       JOIN "invoice" i ON i."id" = pc."invoiceId"
+       JOIN "user" u ON u."id" = pc."userId"
+      WHERE pc."status" = 'pending'`
+  );
 
-  if (!orders.length && !bookings.length && !applications.length) return;
+  if (!orders.length && !bookings.length && !applications.length && !claims.length) return;
 
   const lines = [];
+  if (claims.length) {
+    lines.push(`⚠ Crypto claims waiting for review (${claims.length}):`);
+    for (const c of claims) lines.push(`  ${c.refCode} via ${c.chain} — ${c.email}`);
+  }
   if (orders.length) {
     lines.push(`Orders (${orders.length}):`);
     for (const o of orders)
@@ -59,11 +72,65 @@ async function sendDailyDigest(env) {
       lines.push(`  ${b.refCode} — ${b.serviceName} · ${b.startAt} · ${b.buyerName || "guest"}`);
   }
   if (applications.length) {
-    lines.push(`Custody applications (${applications.length}):`);
+    lines.push(`Membership applications (${applications.length}):`);
     for (const a of applications) lines.push(`  ${a.email} · ${a.appliedAt}`);
   }
 
   await sendAdminNotice(env, "Bank of Sol — daily digest", lines, "digest");
+}
+
+// ── Monthly loan tracking ───────────────────────────────────────────────────
+// On each active loan's dueDay (UTC), drop an amount-0 'loan_due' marker into
+// the member's ledger — the monthly schedule made visible in the itemized
+// list — and email the member. The marker doubles as the idempotency guard:
+// one per loan per calendar month.
+async function trackLoansMonthly(env) {
+  const today = new Date();
+  const day = today.getUTCDate();
+  const monthKey = today.toISOString().slice(0, 7); // 'YYYY-MM'
+
+  const due = await rows(
+    env,
+    `SELECT l.*, u."email", u."name" FROM "loan" l
+      JOIN "user" u ON u."id" = l."userId"
+     WHERE l."status" = 'active' AND l."dueDay" <= ? AND l."startDate" < ?`,
+    day,
+    `${monthKey}-32`
+  );
+
+  for (const loan of due) {
+    // Skip the loan's first partial month and months already marked.
+    if (loan.startDate.slice(0, 7) === monthKey) continue;
+    try {
+      const marked = await env.DB.prepare(
+        `SELECT 1 FROM "ledger_entry"
+          WHERE "loanId" = ? AND "kind" = 'loan_due' AND "entryDate" LIKE ?`
+      )
+        .bind(loan.id, `${monthKey}%`)
+        .first();
+      if (marked) continue;
+
+      await env.DB.prepare(
+        `INSERT INTO "ledger_entry"
+           ("id","userId","kind","amountCents","loanId","note","createdBy","entryDate","createdAt")
+         VALUES (?,?,'loan_due',0,?,?,?,?,?)`
+      )
+        .bind(
+          crypto.randomUUID(),
+          loan.userId,
+          loan.id,
+          `${loan.refCode} monthly payment due${loan.monthlyDueCents ? ` — $${(loan.monthlyDueCents / 100).toFixed(2)}` : ""}`,
+          "system",
+          new Date().toISOString(),
+          new Date().toISOString()
+        )
+        .run();
+
+      if (loan.email) await sendLoanDueNotice(env, { email: loan.email, name: loan.name }, loan);
+    } catch (e) {
+      console.error(`[digest] loan tracking failed for ${loan.refCode}: ${e?.message || e}`);
+    }
+  }
 }
 
 // ── Booking reminders ───────────────────────────────────────────────────────
@@ -126,5 +193,6 @@ async function sweepStalePending(env) {
 export async function runDailyCron(env) {
   await sweepStalePending(env);
   await sendReminders(env);
+  await trackLoansMonthly(env);
   await sendDailyDigest(env);
 }

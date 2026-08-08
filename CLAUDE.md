@@ -6,8 +6,13 @@ architecture-altering change.
 
 ## What this is
 
-bankofsol.app + shop.bankofsol.app: crypto custody (Solana, watch-only), paid
-consulting bookings, a storefront, and (Phase 3) a Solana Pay merchant checkout.
+bankofsol.app + shop.bankofsol.app: a **member platform for hiring Sol** (that
+framing is internal — the public site just recruits members). Paid consulting
+bookings, a storefront, and behind the login the banking core: per-member
+LEDGER (signed cents), invoices with line items, crypto payment rails
+(XRP/SOL/BTC/TON receiving addresses + manual claim confirmation), loans with
+monthly tracking, engagements, reviews. **The public site stays crypto-free**
+— crypto is a payment method members see inside /billing, never marketing.
 One Cloudflare Worker: React+Vite SPA (`src/`) + file-routed API (`functions/api/*`)
 + D1 + R2 + a separate mailer Worker (`workers/mailer/` — email + all crons).
 
@@ -40,8 +45,11 @@ npm run deploy:mailer              # deploy workers/mailer (needed on email/dige
    id is the authorization). Don't add auth to them.
 5. **Email only via `functions/lib/email.js`** — never throws, always logs to
    `email_log` (subjects + outcomes only, never bodies/links).
-6. **Demo custody numbers only from `DEMO_VAULT`** in `DemoVaultPreview.jsx` (no data
-   props) with its structural PREVIEW/DEMO labeling. No APY/yield language anywhere.
+6. **Demo account numbers only from `DEMO_ACCOUNT`** in `DemoAccountPreview.jsx` (no
+   data props) with its structural PREVIEW/DEMO labeling. No APY/yield language
+   anywhere. **The ledger is facts, claims are intents**: a crypto payment claim
+   only touches the ledger when Sol confirms it; the signed ledger
+   (`amountCents` + = owes, − = credit) is the single source of balance truth.
 7. **Better Auth stays pinned at 1.6.23** until every version-note in
    `functions/lib/auth.js` is re-verified.
 8. **Verify UI at desktop AND 375px** (no horizontal page scroll) before calling any

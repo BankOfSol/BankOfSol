@@ -9,7 +9,7 @@ export default function VerifyBanner() {
   return (
     <div className="form-result error" role="alert">
       Your email isn't verified yet — check your inbox for the confirmation
-      link before applying for custody or booking time.
+      link before applying for membership or booking time.
     </div>
   );
 }

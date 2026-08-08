@@ -42,7 +42,7 @@ export default function Nav() {
           </Link>
         )}
         <nav className="nav-links" aria-label="Main">
-          <SiteLink to="/custody">Custody</SiteLink>
+          <SiteLink to="/membership">Membership</SiteLink>
           <SiteLink to="/consulting">Consulting</SiteLink>
           <SiteLink to="/book">Book time</SiteLink>
           {shopHost ? (

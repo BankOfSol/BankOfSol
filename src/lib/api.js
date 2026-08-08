@@ -85,13 +85,44 @@ export const api = {
     req(`/api/admin/booking/list?${new URLSearchParams(params)}`),
   adminBookingAction: (payload) => post("/api/admin/booking/action", payload),
 
-  // ── Custody ───────────────────────────────────────────────────────────────
-  custodyApply: (payload) => post("/api/custody/apply", payload),
-  custodyStatus: () => req("/api/custody/status"),
-  adminCustodyQueue: (status = "applied") =>
-    req(`/api/admin/custody/queue?status=${status}`),
-  adminCustodyDecide: (id, action, note) =>
-    post("/api/admin/custody/decide", { id, action, ...(note ? { note } : {}) }),
+  // ── Membership ────────────────────────────────────────────────────────────
+  membershipApply: (payload) => post("/api/membership/apply", payload),
+  membershipStatus: () => req("/api/membership/status"),
+  adminMembershipQueue: (status = "applied") =>
+    req(`/api/admin/membership/queue?status=${status}`),
+  adminMembershipDecide: (id, action, note) =>
+    post("/api/admin/membership/decide", { id, action, ...(note ? { note } : {}) }),
+
+  // ── Billing (member) ──────────────────────────────────────────────────────
+  billing: () => req("/api/billing"),
+  payInvoice: (id) =>
+    post(`/api/billing/invoices/${id}/pay`, {
+      returnUrl: window.location.origin + "/billing",
+    }),
+  claimInvoice: (id, payload) => post(`/api/billing/invoices/${id}/claim`, payload),
+  billingConfirm: (sessionId) => post("/api/billing/confirm", { sessionId }),
+
+  // ── Reviews ───────────────────────────────────────────────────────────────
+  postReview: (payload) => post("/api/reviews", payload),
+  myReviews: () => req("/api/reviews"),
+
+  // ── Members (admin account management) ────────────────────────────────────
+  adminMembers: (search) =>
+    req(`/api/admin/members${search ? `?search=${encodeURIComponent(search)}` : ""}`),
+  adminMember: (userId) => req(`/api/admin/members/${userId}`),
+  adminSaveInvoice: (payload) => post("/api/admin/members/invoice", { action: "save", ...payload }),
+  adminInvoiceAction: (id, action) => post("/api/admin/members/invoice", { id, action }),
+  adminRecordPayment: (payload) => post("/api/admin/members/payment", payload),
+  adminLoan: (payload) => post("/api/admin/members/loan", payload),
+  adminSaveEngagement: (payload) => post("/api/admin/members/engagement", payload),
+  adminClaims: () => req("/api/admin/members/claims"),
+  adminClaimAction: (id, action, amount) =>
+    post("/api/admin/members/claims", { id, action, ...(amount ? { amount } : {}) }),
+
+  // ── Payment rails (superadmin) ────────────────────────────────────────────
+  rails: () => req("/api/superadmin/rails"),
+  saveRail: (payload) => post("/api/superadmin/rails", payload),
+  deleteRail: (id) => req(`/api/superadmin/rails?id=${id}`, { method: "DELETE" }),
 
   // ── Admin misc ────────────────────────────────────────────────────────────
   adminCounts: () => req("/api/admin/counts"),

@@ -9,7 +9,8 @@ import Book from "./pages/Book.jsx";
 import BookingReturn from "./pages/BookingReturn.jsx";
 import Shop from "./pages/Shop.jsx";
 import ShopProduct from "./pages/ShopProduct.jsx";
-import Custody from "./pages/Custody.jsx";
+import Membership from "./pages/Membership.jsx";
+import Billing from "./pages/Billing.jsx";
 import Login from "./pages/Login.jsx";
 import Signup from "./pages/Signup.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
@@ -26,7 +27,7 @@ function Protected({ children }) {
   const location = useLocation();
   if (isPending) return <div className="spinner">Loading…</div>;
   // Carry where they were headed so login lands them back there instead of
-  // the dashboard — keeps the /custody → apply funnel intact for someone who
+  // the dashboard — keeps the /membership → apply funnel intact for someone who
   // has to log in mid-flow.
   if (!data?.user)
     return (
@@ -55,7 +56,17 @@ export default function App() {
             admins manage it in place via ?view=manage. */}
         <Route path="/shop" element={<Shop />} />
         <Route path="/shop/:id" element={<ShopProduct />} />
-        <Route path="/custody" element={<Custody />} />
+        <Route path="/membership" element={<Membership />} />
+        {/* The pre-pivot URL — keep old links working. */}
+        <Route path="/custody" element={<Navigate to="/membership" replace />} />
+        <Route
+          path="/billing"
+          element={
+            <Protected>
+              <Billing />
+            </Protected>
+          }
+        />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
