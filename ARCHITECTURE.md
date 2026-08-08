@@ -14,7 +14,14 @@ next session has to rediscover. (Discipline inherited from PoundPlay, which prov
 - **Deploys are explicit**: `npm run deploy` (build + `wrangler deploy`). `git push` is
   backup, not release. The mailer Worker deploys separately: `npm run deploy:mailer` —
   required whenever `workers/mailer/*` or anything it imports
-  (`functions/lib/email.js`, `functions/lib/digest.js`) changes.
+  (`functions/lib/email.js`, `functions/lib/digest.js`) changes. **Deploy the mailer
+  first on a fresh account** — the main Worker's `EMAIL` service binding needs its
+  target to exist.
+- ⚠️ **`public/.assetsignore` (contents: `_worker.js`) is load-bearing.** The build
+  writes compiled server code to `dist/_worker.js`, and `dist/` is also the static
+  asset directory — without that ignore file wrangler refuses to deploy (correctly:
+  it would publish server code to the internet). Vite copies it from `public/` on
+  every build, so it survives `rm -rf dist`. Never delete it.
 - **Domains**: `bankofsol.app`, `www.`, `shop.` — all `custom_domain` routes on the one
   Worker (created on deploy; the zone must exist in the account first). The SPA is
   host-aware (`src/lib/host.js`): the shop subdomain renders the storefront at `/`;
@@ -33,9 +40,11 @@ next session has to rediscover. (Discipline inherited from PoundPlay, which prov
 
 ## 2 · Bindings & env
 
+Account: `Kaasi.serrano@gmail.com's Account` (`568986ebd89d7e53c2666c4dd94b676b`).
+
 | Binding | Type | Target | Notes |
 |---|---|---|---|
-| `DB` | D1 | `bankofsol` | id in wrangler.jsonc (TODO: fill after `d1 create`) |
+| `DB` | D1 | `bankofsol` | `716caa51-02da-4005-b765-1f283fa9f0bb` (same id in both wrangler configs) |
 | `BUCKET` | R2 | `bankofsol-uploads` | uploads via `/api/upload`, served via `/api/files/<key>` — never a public bucket URL |
 | `EMAIL` | service | `bankofsol-mailer` | in the mailer itself, `EMAIL` is the real `send_email` binding — same call shape (`env.EMAIL.send({...})`) both places |
 | `ASSETS` | assets | `./dist` | `run_worker_first: ["/api/*"]`, SPA fallback |
@@ -125,8 +134,13 @@ automation + the not-a-bank line in every footer, and logs every attempt to
 `email_log` (subjects + outcomes only). Prod path: site Worker → `EMAIL` service
 binding → `bankofsol-mailer` → Email Sending. Dev (non-https BETTER_AUTH_URL): full
 mail printed to the wrangler console — that's how you grab verification/reset links
-locally. Requires Email Sending enabled for bankofsol.app (DKIM/SPF) before prod mail
-flows.
+locally.
+
+**Email Sending is ENABLED for bankofsol.app** (2026-08-08; DKIM selector `cf-bounce`,
+return-path `cf-bounce.bankofsol.app`, tag `77031d818695423299be531b4cbe1cd6`). DNS
+was auto-provisioned in the Cloudflare-managed zone and verified live: DKIM
+(`cf-bounce._domainkey`), SPF + MX on `cf-bounce`, and `_dmarc` at **`p=reject`**.
+Sender is locked to `sol@bankofsol.app` by the mailer's `allowed_sender_addresses`.
 
 ## 7 · Safety invariants (non-negotiable)
 
@@ -151,6 +165,13 @@ Solana Pay merchant checkout (raw JSON-RPC, no SDK). Full plan:
 
 ## Changelog
 
+- **2026-08-08** — **Went live.** Created D1 `bankofsol`
+  (`716caa51-02da-4005-b765-1f283fa9f0bb`) + R2 `bankofsol-uploads`; deployed
+  `bankofsol-mailer` (cron `0 16 * * *`) then `bankofsol` with all three custom
+  domains (apex/www/shop, certs issued); applied all 4 migrations remotely; enabled
+  Email Sending (DNS auto-provisioned + verified). Added the required
+  `public/.assetsignore` so `dist/_worker.js` is never published as a public asset.
+  Remaining before first real signup: `BETTER_AUTH_SECRET`, then Stripe keys.
 - **2026-08-07** — Starter content promoted to a first-class idempotent seed
   (`scripts/seed-starter.sql`, `npm run db:seed[:remote]`) so the sample services,
   availability, shop, and product ship in production too.
