@@ -1,0 +1,38 @@
+# Copy this file to `.dev.vars` for local `wrangler dev` (npm run cf:dev).
+# `.dev.vars` is gitignored — never commit real secrets.
+
+# Long random string used to sign sessions. Generate with:
+#   openssl rand -base64 32
+BETTER_AUTH_SECRET="replace-with-a-long-random-string"
+
+# These mirror wrangler.jsonc [vars] and can be overridden locally.
+BETTER_AUTH_URL="http://localhost:8788"
+ADMIN_EMAIL="kaasi_s@icloud.com"
+
+# Origins allowed to log in / receive Stripe redirects, beyond the production
+# domains. Keep both local ports: 8788 = wrangler dev, 5173 = vite HMR.
+APP_ORIGINS="http://localhost:8788,http://localhost:5173"
+
+# Stripe (shop + booking payments). Use TEST keys locally.
+# STRIPE_WEBHOOK_SECRET is what `stripe listen` prints; without it the webhook
+# rejects everything and you fall back to the /confirm round-trip (by design).
+STRIPE_SECRET_KEY=""
+STRIPE_WEBHOOK_SECRET=""
+
+# Outbound email identity (mirrors wrangler.jsonc [vars]). The EMAIL binding is
+# absent in plain `wrangler dev`, so mail is logged to the console instead of
+# sent. That's the intended local default.
+MAIL_FROM="sol@bankofsol.app"
+MAIL_FROM_NAME="Bank of Sol"
+
+# ── Phase 2: Slant 3D print fulfillment ─────────────────────────────────────
+# Blank = manual-fulfillment mode (print features disabled, shop unaffected).
+SLANT3D_API_KEY=""
+
+# ── Phase 3: Solana (custody vault + merchant checkout) ─────────────────────
+# Blank = Solana features off. Devnet for dry runs; Helius (free tier) for
+# production — the public mainnet endpoint is rate-limited and not for prod.
+SOLANA_RPC_URL=""
+SOLANA_NETWORK="devnet"
+# Devnet USDC mint below; mainnet is EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+USDC_MINT="4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"

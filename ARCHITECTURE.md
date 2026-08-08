@@ -1,0 +1,162 @@
+# Bank of Sol — Architecture (living map)
+
+The always-current picture of bankofsol.app. **Any change that adds/renames/removes a
+route, table, column, binding, env var, R2 convention, auth rule, or deploy step must
+edit this file in the same commit** — a change that isn't recorded here is a change the
+next session has to rediscover. (Discipline inherited from PoundPlay, which proved it.)
+
+## 1 · Stack & deploy model
+
+- **One real Worker** `bankofsol` serving everything: React 18 + Vite SPA (`src/` →
+  `dist/`) as static assets, plus the `/api/*` backend — Pages-Functions-style files in
+  `functions/api/*` compiled by `wrangler pages functions build --outdir=./dist/_worker.js/`
+  (see `package.json` build). Bindings live in `wrangler.jsonc`, NOT a dashboard.
+- **Deploys are explicit**: `npm run deploy` (build + `wrangler deploy`). `git push` is
+  backup, not release. The mailer Worker deploys separately: `npm run deploy:mailer` —
+  required whenever `workers/mailer/*` or anything it imports
+  (`functions/lib/email.js`, `functions/lib/digest.js`) changes.
+- **Domains**: `bankofsol.app`, `www.`, `shop.` — all `custom_domain` routes on the one
+  Worker (created on deploy; the zone must exist in the account first). The SPA is
+  host-aware (`src/lib/host.js`): the shop subdomain renders the storefront at `/`;
+  every other path is identical on all hosts.
+- **Local dev**: `npm run cf:dev` (build + `wrangler dev`, port 8788) with `.dev.vars`
+  (copy from `.dev.vars.example`). UI-only HMR: `npm run dev` (:5173, proxies /api).
+- **Starter content**: `scripts/seed-starter.sql` (`npm run db:seed` /
+  `db:seed:remote`) ships the launch samples — Mon–Fri 10:00–16:00 availability, the
+  Intro call ($50/30m) + Working session ($150/60m) services, and the Bank of Sol Shop
+  with the Sol Sun Desk Stand ($24). Fully idempotent (guarded by natural keys); the
+  shop rows resolve their owner from ADMIN_EMAIL's user, so run it after first signup.
+  ⚠️ `wrangler dev` serves the BUILT worker — server-code edits need `npm run build`
+  (wrangler dev hot-reloads the rebuilt file). ⚠️ wrangler dev addresses requests as
+  `http://bankofsol.app` (it simulates the first route) — `functions/lib/auth.js`
+  trusts that shape in dev only.
+
+## 2 · Bindings & env
+
+| Binding | Type | Target | Notes |
+|---|---|---|---|
+| `DB` | D1 | `bankofsol` | id in wrangler.jsonc (TODO: fill after `d1 create`) |
+| `BUCKET` | R2 | `bankofsol-uploads` | uploads via `/api/upload`, served via `/api/files/<key>` — never a public bucket URL |
+| `EMAIL` | service | `bankofsol-mailer` | in the mailer itself, `EMAIL` is the real `send_email` binding — same call shape (`env.EMAIL.send({...})`) both places |
+| `ASSETS` | assets | `./dist` | `run_worker_first: ["/api/*"]`, SPA fallback |
+
+Vars (wrangler.jsonc): `BETTER_AUTH_URL`, `ADMIN_EMAIL` (= superadmin), `APP_ORIGINS`
+(comma-separated extra trusted origins), `MAIL_FROM`, `MAIL_FROM_NAME`.
+Secrets (`wrangler secret put`): `BETTER_AUTH_SECRET`, `STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET`; Phase 2 `SLANT3D_API_KEY`; Phase 3 `SOLANA_RPC_URL` (+ vars
+`SOLANA_NETWORK`, `USDC_MINT`).
+
+**The mailer Worker** (`workers/mailer/`): owns `send_email` (allowed sender
+`sol@bankofsol.app`) and ALL cron triggers (the compiled main Worker only exports
+`fetch`). Cron `0 16 * * *` (8am PT) → `functions/lib/digest.js` `runDailyCron`:
+stale-pending sweep (>24h), booking reminders (next 26h, unreminded), daily digest to
+ADMIN_EMAIL (paid orders / bookings / custody applications; silent when empty).
+
+## 3 · Data model (D1 `bankofsol`, migrations/ numbered SQL)
+
+- **0001** Better Auth core (`user` + `isAdmin`/`isSuperAdmin`, `session`, `account`
+  with timestamp defaults, `verification`) + `admin_activity` + `email_log`
+  (subjects + outcomes ONLY — never bodies/URLs/tokens).
+- **0002 shop**: `shop` (single active row v1, keyed `ownerUserId`), `product`
+  (priceCents INTEGER, images JSON, colors JSON, modelUrl .3mf/.glb, status
+  draft|published|soldout|archived|hidden), `shop_order` (guest-capable:
+  `buyerEmail/Name/Ip` snapshots, refCode `BOS-XXXXXX` UNIQUE, status CHECK already
+  includes Phase-2 `fulfilling` — CHECK edits are table rebuilds, so it shipped
+  complete).
+- **0003 booking**: `consult_service` (durationMin/priceCents/slotEveryMin/bufferMin/
+  leadHours/maxDaysAhead), `availability_rule` (weekly wall-clock America/Los_Angeles),
+  `availability_exception` (closed = whole-day blackout, open = extra window),
+  `booking` (UTC instants, `buyerTz` for rendering, `icsToken` UNIQUE = calendar/cancel
+  key, `reminderSentAt`).
+- **0004 custody waitlist**: `custody_account` (userId UNIQUE, status
+  applied|approved|rejected|suspended|closed, decidedBy/At). Phase 3 adds vault tables
+  (0006) + merchant checkout (0007) per the build plan.
+
+Money is integer cents everywhere; `parseFloat` is banned in money files. Slots are
+computed on request, never materialized; the atomic primitive is the guarded
+`INSERT ... SELECT ... WHERE NOT EXISTS(overlap)` in `functions/lib/booking.js`
+(D1 has no transactions).
+
+## 4 · API routes (gate → purpose)
+
+Auth: `/api/auth/[[route]]` (Better Auth 1.6.23 — pinned; email+password, HARD
+verification gate, no session until verified). `/api/me` public session snapshot.
+Gates live in `functions/lib/util.js` (`requireUser/VerifiedUser/Admin/SuperAdmin/
+CustodyClient` returning `{user}|{error}`) — every route calls its gate explicitly, no
+middleware. Admin mutations all `logAdminActivity`.
+
+| Route | Gate | Purpose |
+|---|---|---|
+| POST `/api/upload` | user (3D files: admin) | R2 upload; images 25MB, .3mf/.glb 8MB, .stl 50MB |
+| GET `/api/files/[key]` | public | immutable R2 read-through (no Range handling on purpose) |
+| POST `/api/stripe/webhook` | HMAC | ONE webhook; dispatch on `metadata.kind` HANDLERS map: `bos_shop`, `bos_booking` |
+| GET `/api/shop` · `/api/shop/products/[id]` | public | storefront / product detail (admins see drafts; 404 not 403) |
+| POST `/api/shop/checkout` | public+caps | pending order → Stripe session (guest ok; price from DB only; 503-not-502 on Stripe failure) |
+| POST `/api/shop/confirm` | public (cs_ id is auth) | webhook fallback; COALESCE discipline vs the race |
+| GET `/api/shop/orders` | user | my orders |
+| `/api/admin/shop{,/products,/orders}` | admin | shop upsert (bootstrap), product CRUD (delete 409s with orders), order transitions (ORDER_TRANSITIONS) |
+| GET `/api/booking/services` · `/slots` | public | active services / computed open slots (bare UTC instants) |
+| POST `/api/booking/checkout` | public+caps | server re-derives slot validity, guarded INSERT claims it, Stripe session (kind bos_booking) |
+| POST `/api/booking/confirm` | public | fallback; emails fire from whichever of webhook/confirm flips the row |
+| POST `/api/booking/cancel` | icsToken or owner | ≥24h → auto full refund (`CANCEL_CUTOFF_HOURS`); inside → 409 "reply to email" |
+| GET `/api/booking/ics/[token]` | unguessable token | hand-written RFC 5545 VEVENT (paid/completed only) |
+| GET `/api/booking/mine` | user | my bookings (includes icsToken — caller's own) |
+| `/api/admin/booking/{services,availability,list,action}` | admin | service CRUD, rules+exceptions editor, list, complete/cancel(+refund)/meeting-link |
+| POST `/api/custody/apply` | verified user | one application per user (UNIQUE); emails confirmation |
+| GET `/api/custody/status` | user | drives the locked-overlay progress tracker |
+| `/api/admin/custody/{queue,decide}` | admin | FIFO queue; approve/reject/suspend/close (emails on approve/reject) |
+| GET `/api/admin/counts` · `/api/admin/email-log` | admin | tab badges; outbound-mail ledger |
+| `/api/superadmin/{admins,activity}` | superadmin | grant/revoke isAdmin (isSuperAdmin NEVER grantable); audit feed |
+
+## 5 · Auth & roles
+
+Better Auth pinned **1.6.23** (`functions/lib/auth.js` comments encode version-specific
+behaviors — re-verify all before bumping). Roles as `additionalFields` with
+`input:false` (no self-escalation). Superadmin = `SUPER_ADMIN_EMAIL || ADMIN_EMAIL`,
+self-healed into the DB at session time. Cross-subdomain cookies (`.bankofsol.app`)
+enabled only in prod (an explicit domain would break localhost). Owner-scoped routes
+return 404, not 403. The shop checkout/confirm are deliberately public (guest
+checkout) — do NOT "fix" them with requireUser.
+
+## 6 · Email
+
+All outbound goes through `functions/lib/email.js`: never throws, discloses
+automation + the not-a-bank line in every footer, and logs every attempt to
+`email_log` (subjects + outcomes only). Prod path: site Worker → `EMAIL` service
+binding → `bankofsol-mailer` → Email Sending. Dev (non-https BETTER_AUTH_URL): full
+mail printed to the wrangler console — that's how you grab verification/reset links
+locally. Requires Email Sending enabled for bankofsol.app (DKIM/SPF) before prod mail
+flows.
+
+## 7 · Safety invariants (non-negotiable)
+
+1. **No private keys or seed material anywhere** — code, DB, env, logs, docs. Custody
+   is watch-only: the Phase-3 registry stores PUBLIC keys only (validated 32-byte
+   base58); withdrawals are tickets fulfilled by offline signing + on-chain
+   verification.
+2. Never copy from `/Users/sol/AI MAIN/APPS/BankOfSol` (old CDP server-wallet
+   experiment; its `.env`/`wallet_data.txt` are off-limits).
+3. `DemoVaultPreview` takes NO data props — demo figures come only from its exported
+   `DEMO_VAULT` constant, with structural labeling (PREVIEW ribbon, watermark, ·DEMO
+   chips, no-yield footer). No APY/yield language anywhere.
+4. Client assets are never lent/staked; revenue is fees for services.
+
+## 8 · Roadmap
+
+Phase 1 (this) — live site: auth, consulting, paid booking, shop, custody waitlist +
+teaser. Phase 2 — Slant 3D print fulfillment (`fulfilling` status + tracking cron;
+degraded manual mode without `SLANT3D_API_KEY`). Phase 3 — watch-only custody vault +
+Solana Pay merchant checkout (raw JSON-RPC, no SDK). Full plan:
+`/Users/sol/.claude/plans/how-does-a-bank-imperative-sunbeam.md`.
+
+## Changelog
+
+- **2026-08-07** — Starter content promoted to a first-class idempotent seed
+  (`scripts/seed-starter.sql`, `npm run db:seed[:remote]`) so the sample services,
+  availability, shop, and product ship in production too.
+- **2026-08-07** — Initial Phase 1 build: scaffold, Better Auth (1.6.23) with hard
+  verification gate, shop (Stripe, guest checkout), booking system (computed slots,
+  guarded-INSERT race safety, .ics, auto-refund policy), custody waitlist + demo-labeled
+  teaser, admin/superadmin, mailer Worker with daily cron, PWA manifest. Verified E2E
+  locally at desktop + 375px (auth chain, slot math incl. lead/buffer/weekend gating,
+  checkout chains to the Stripe boundary, custody lifecycle, email ledger).

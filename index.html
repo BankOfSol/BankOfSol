@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0B0E11" />
+    <title>Bank of Sol — Solana Custody, Crypto Payments & Consulting</title>
+    <meta
+      name="description"
+      content="Bank of Sol: cold-storage crypto custody on Solana, a crypto checkout platform for businesses, consulting (web, apps, financial automation), and a storefront. Safety over everything."
+    />
+    <link rel="canonical" href="https://bankofsol.app/" />
+
+    <!-- Icons + PWA (.app spirit: installable, HTTPS-only — the .app TLD is
+         HSTS-preloaded, so the site can never be served over plain HTTP). -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <!-- Social link previews (crawlers read these statically). -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Bank of Sol" />
+    <meta property="og:title" content="Bank of Sol — Solana Custody, Crypto Payments & Consulting" />
+    <meta
+      property="og:description"
+      content="Cold-storage crypto custody, Solana payments for businesses, and hands-on consulting. Safety over everything."
+    />
+    <meta property="og:url" content="https://bankofsol.app/" />
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "ProfessionalService",
+      "@id": "https://bankofsol.app/#org",
+      "name": "Bank of Sol",
+      "url": "https://bankofsol.app/",
+      "description": "Crypto custody and Solana payment services, software consulting, and a storefront. Bank of Sol is a technology and services company, not a chartered bank.",
+      "areaServed": "Worldwide",
+      "knowsAbout": ["Solana", "crypto custody", "payments", "web development", "app development", "business automation"]
+    }
+    </script>
+
+    <!-- Match the app's dark palette before the CSS loads — no white flash. -->
+    <style>html { background: #0B0E11; }</style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

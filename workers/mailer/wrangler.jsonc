@@ -1,0 +1,53 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // bankofsol-mailer — the only Worker with a `send_email` binding, and the
+  // home of ALL cron work (the compiled main Worker exports only `fetch`).
+  //
+  //   bankofsol Worker --service binding "EMAIL"--> this Worker --send_email--> Email Service
+  //
+  // functions/lib/email.js calls env.EMAIL.send(...) either way: in the main
+  // Worker that resolves to this Worker's RPC send(); in here env.EMAIL *is*
+  // the real send_email binding — same call shape, zero template changes.
+  //
+  // ⚠️ This Worker does NOT ride `npm run deploy`. Deploy it explicitly with
+  //   npm run deploy:mailer
+  // whenever this file or anything it imports (functions/lib/email.js,
+  // functions/lib/digest.js) changes.
+  "name": "bankofsol-mailer",
+  "compatibility_date": "2026-06-30",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "src/index.js",
+  "workers_dev": false,
+  "observability": { "enabled": true },
+
+  // Requires Email Sending to be enabled for bankofsol.app (setup checklist).
+  // Locked down so this Worker can only ever send as Sol's address.
+  "send_email": [
+    {
+      "name": "EMAIL",
+      "allowed_sender_addresses": ["sol@bankofsol.app"]
+    }
+  ],
+
+  // Same D1 as the site — crons read bookings/orders/custody straight from it.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bankofsol",
+      "database_id": "TODO-after-d1-create"
+    }
+  ],
+
+  // 16:00 UTC = 8am PT: daily digest (new orders, bookings, custody
+  // applications) + booking reminders + stale-pending sweep.
+  "triggers": {
+    "crons": ["0 16 * * *"]
+  },
+
+  "vars": {
+    "MAIL_FROM": "sol@bankofsol.app",
+    "MAIL_FROM_NAME": "Bank of Sol",
+    "ADMIN_EMAIL": "kaasi_s@icloud.com",
+    "SITE_URL": "https://bankofsol.app"
+  }
+}

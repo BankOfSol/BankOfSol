@@ -1,0 +1,34 @@
+{
+  "name": "bankofsol",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && wrangler pages functions build --outdir=./dist/_worker.js/",
+    "preview": "vite preview",
+    "cf:dev": "npm run build && wrangler dev",
+    "db:migrate:local": "wrangler d1 migrations apply bankofsol --local",
+    "db:migrate": "wrangler d1 migrations apply bankofsol --remote",
+    "db:seed": "wrangler d1 execute bankofsol --local --file=scripts/seed-starter.sql",
+    "db:seed:remote": "wrangler d1 execute bankofsol --remote --file=scripts/seed-starter.sql",
+    "deploy": "npm run build && wrangler deploy",
+    "deploy:mailer": "wrangler deploy -c workers/mailer/wrangler.jsonc"
+  },
+  "dependencies": {
+    "@better-auth/core": "1.6.23",
+    "better-auth": "1.6.23",
+    "heic2any": "^0.0.4",
+    "kysely": "^0.27.4",
+    "kysely-d1": "^0.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-easy-crop": "^6.2.2",
+    "react-router-dom": "^6.26.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.2",
+    "vite": "^5.4.8",
+    "wrangler": "^4.20.0"
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Bank of Sol — one real Worker (Static Assets) serving the SPA + /api/*.
+  // The React SPA builds to ./dist and is served as static assets; the
+  // /functions Pages Functions are compiled into ./dist/_worker.js by
+  //   wrangler pages functions build --outdir=./dist/_worker.js/
+  // (see package.json "build") and handle the /api/* backend.
+  //
+  // Deploys are explicit: `npm run deploy` (NOT git-connected Pages) — bindings
+  // live HERE, not in a dashboard. Lesson inherited from PoundPlay.
+  "name": "bankofsol",
+  "compatibility_date": "2026-06-30",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "./dist/_worker.js/index.js",
+  "observability": { "enabled": true },
+
+  // Local dev port — keep in sync with .dev.vars BETTER_AUTH_URL.
+  "dev": { "port": 8788 },
+
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    // Only run the Worker (compiled Functions) for API routes; everything
+    // else is served from static assets, with SPA fallback to index.html.
+    "run_worker_first": ["/api/*"],
+    "not_found_handling": "single-page-application"
+  },
+
+  // Custom domains — created on deploy. The bankofsol.app ZONE must exist in
+  // this Cloudflare account first (setup checklist step 1); until it does,
+  // comment these out and use the workers.dev URL.
+  "routes": [
+    { "pattern": "bankofsol.app", "custom_domain": true },
+    { "pattern": "www.bankofsol.app", "custom_domain": true },
+    { "pattern": "shop.bankofsol.app", "custom_domain": true }
+  ],
+
+  // D1 (SQLite) — auth, shop, booking, custody tables.
+  // database_id: fill in after `npx wrangler d1 create bankofsol`.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bankofsol",
+      "database_id": "TODO-after-d1-create"
+    }
+  ],
+
+  // R2 — product images / STL uploads, served back via /api/files/<key>.
+  // Create with `npx wrangler r2 bucket create bankofsol-uploads`.
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "bankofsol-uploads"
+    }
+  ],
+
+  // Outbound email goes through the bankofsol-mailer Worker (service binding),
+  // because that Worker owns the `send_email` binding and the cron triggers.
+  // Deploy the mailer BEFORE the first deploy of this Worker. In local
+  // `wrangler dev` env.EMAIL is absent and functions/lib/email.js logs mail to
+  // the console instead — that's the intended local default.
+  "services": [{ "binding": "EMAIL", "service": "bankofsol-mailer" }],
+
+  // Non-secret vars. Secrets are set with `npx wrangler secret put <NAME>`
+  // (do NOT commit them here): BETTER_AUTH_SECRET, STRIPE_SECRET_KEY,
+  // STRIPE_WEBHOOK_SECRET; later SLANT3D_API_KEY, SOLANA_RPC_URL.
+  "vars": {
+    "BETTER_AUTH_URL": "https://bankofsol.app",
+    "ADMIN_EMAIL": "kaasi_s@icloud.com",
+    "APP_ORIGINS": "",
+    "MAIL_FROM": "sol@bankofsol.app",
+    "MAIL_FROM_NAME": "Bank of Sol"
+  }
+}
