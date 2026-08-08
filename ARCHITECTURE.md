@@ -165,6 +165,17 @@ Solana Pay merchant checkout (raw JSON-RPC, no SDK). Full plan:
 
 ## Changelog
 
+- **2026-08-08** — **Production verified end-to-end.** `BETTER_AUTH_SECRET` set; Sol's
+  admin account created and email-verified through the REAL mail path (email_log:
+  verify ok=1 → welcome ok=1), confirming Worker → service binding → mailer →
+  Email Sending delivers. Starter seed applied remotely (5 availability rules, 2
+  services, shop + product). Live slot math correct (weekends excluded, lead gate
+  honored, last start 14:30 PT = exactly duration+buffer before 16:00). Checkout
+  without a Stripe key degrades to a clean 503 and rolls back its pending row (0
+  orphans). Custody teaser verified logged-out: blurred preview, PREVIEW ribbon, 6
+  ·DEMO chips, no-yield footer, zero APY language. **Still pending: Stripe keys** —
+  until `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` are set, both checkout rails
+  503 by design and nothing can be sold.
 - **2026-08-08** — **Went live.** Created D1 `bankofsol`
   (`716caa51-02da-4005-b765-1f283fa9f0bb`) + R2 `bankofsol-uploads`; deployed
   `bankofsol-mailer` (cron `0 16 * * *`) then `bankofsol` with all three custom
