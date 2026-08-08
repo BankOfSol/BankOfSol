@@ -1,6 +1,7 @@
+import { useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useSession } from "./lib/auth-client.js";
-import { isShopHost } from "./lib/host.js";
+import { isShopHost, isLocalDev, shopSiteUrl } from "./lib/host.js";
 import Nav from "./components/Nav.jsx";
 import Footer from "./components/Footer.jsx";
 import Home from "./pages/Home.jsx";
@@ -27,8 +28,8 @@ function Protected({ children }) {
   const location = useLocation();
   if (isPending) return <div className="spinner">Loading…</div>;
   // Carry where they were headed so login lands them back there instead of
-  // the dashboard — keeps the /membership → apply funnel intact for someone who
-  // has to log in mid-flow.
+  // the dashboard — keeps the /membership → apply funnel intact for someone
+  // who has to log in mid-flow.
   if (!data?.user)
     return (
       <Navigate
@@ -40,22 +41,78 @@ function Protected({ children }) {
   return children;
 }
 
+// Full-page hop to the main site, keeping the path — the shop host serves
+// ONLY the storefront.
+function ApexRedirect() {
+  const location = useLocation();
+  useEffect(() => {
+    const apex = window.location.hostname.replace(/^shop\./, "");
+    window.location.replace(
+      `${window.location.protocol}//${apex}${location.pathname}${location.search}`
+    );
+  }, [location]);
+  return <div className="spinner">Taking you to bankofsol.app…</div>;
+}
+
+// The main site doesn't host the shop (except in local dev, where there are
+// no subdomains) — old /shop links forward to the storefront.
+function ShopForward({ children }) {
+  const location = useLocation();
+  const local = isLocalDev();
+  useEffect(() => {
+    if (!local) {
+      const sub = location.pathname.replace(/^\/shop/, "") || "/";
+      window.location.replace(shopSiteUrl(sub === "/" ? "/" : `/shop${sub}`));
+    }
+  }, [local, location]);
+  if (local) return children;
+  return <div className="spinner">Opening the shop…</div>;
+}
+
 export default function App() {
-  // shop.bankofsol.app serves the same SPA; only the index route differs.
-  // Product pages keep the /shop/:id path on every host so links never fork.
-  const shopHost = isShopHost();
+  // shop.bankofsol.app is a standalone storefront: the store at "/", product
+  // pages, nothing else — any other path hops back to the apex.
+  if (isShopHost()) {
+    return (
+      <>
+        <Nav />
+        <Routes>
+          <Route path="/" element={<Shop />} />
+          <Route path="/shop" element={<Navigate to="/" replace />} />
+          <Route path="/shop/:id" element={<ShopProduct />} />
+          <Route path="*" element={<ApexRedirect />} />
+        </Routes>
+        <Footer />
+      </>
+    );
+  }
+
   return (
     <>
       <Nav />
       <Routes>
-        <Route path="/" element={shopHost ? <Shop /> : <Home />} />
+        <Route path="/" element={<Home />} />
         <Route path="/consulting" element={<Consulting />} />
         <Route path="/book" element={<Book />} />
         <Route path="/booking/return" element={<BookingReturn />} />
-        {/* Public storefront — buying needs no account (guest checkout);
-            admins manage it in place via ?view=manage. */}
-        <Route path="/shop" element={<Shop />} />
-        <Route path="/shop/:id" element={<ShopProduct />} />
+        {/* The storefront lives on shop.bankofsol.app — these forward there
+            in production and render inline only in local dev. */}
+        <Route
+          path="/shop"
+          element={
+            <ShopForward>
+              <Shop />
+            </ShopForward>
+          }
+        />
+        <Route
+          path="/shop/:id"
+          element={
+            <ShopForward>
+              <ShopProduct />
+            </ShopForward>
+          }
+        />
         <Route path="/membership" element={<Membership />} />
         {/* The pre-pivot URL — keep old links working. */}
         <Route path="/custody" element={<Navigate to="/membership" replace />} />

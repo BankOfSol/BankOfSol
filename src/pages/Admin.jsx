@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMe } from "../lib/me-context.jsx";
 import { api } from "../lib/api.js";
+import { shopSiteUrl } from "../lib/host.js";
 import AdminMembers from "../components/AdminMembers.jsx";
 import MembershipQueueAdmin from "../components/MembershipQueueAdmin.jsx";
 import BookingAdmin from "../components/BookingAdmin.jsx";
@@ -124,12 +125,13 @@ export default function Admin() {
         <div className="panel">
           <h3>The shop manages itself in place</h3>
           <p className="muted">
-            Products, orders, and the shop profile live on the storefront —
-            open it with the manage view switched on.
+            The storefront is its own site at shop.bankofsol.app — products,
+            orders, and the shop profile are managed right on it with the
+            manage view switched on. Your admin session carries over.
           </p>
-          <Link className="btn btn-gold" to="/shop?view=manage">
+          <a className="btn btn-gold" href={shopSiteUrl("/?view=manage")}>
             Open shop manager →
-          </Link>
+          </a>
         </div>
       )}
       {tab === "email" && <EmailLog />}

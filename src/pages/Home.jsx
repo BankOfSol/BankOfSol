@@ -23,13 +23,6 @@ const PILLARS = [
     to: "/book",
     link: "See open times →",
   },
-  {
-    icon: "🛒",
-    title: "The shop",
-    body: "Physical goods and 3D-printed products, made to order and shipped to you.",
-    to: "/shop",
-    link: "Browse the shop →",
-  },
 ];
 
 export default function Home() {

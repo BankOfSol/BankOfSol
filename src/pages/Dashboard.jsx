@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useMe } from "../lib/me-context.jsx";
 import { api } from "../lib/api.js";
 import { fmtUsd } from "../lib/money.js";
+import { shopSiteUrl } from "../lib/host.js";
 import VerifyBanner from "../components/VerifyBanner.jsx";
 import usePageMeta from "../lib/usePageMeta.js";
 
@@ -153,9 +154,9 @@ export default function Dashboard() {
           ) : (
             <p className="muted">No orders yet.</p>
           )}
-          <Link className="pillar-link" to="/shop">
+          <a className="pillar-link" href={shopSiteUrl("/")}>
             Browse the shop →
-          </Link>
+          </a>
         </div>
       </div>
     </div>

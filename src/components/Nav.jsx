@@ -27,31 +27,43 @@ function SiteLink({ to, children, end }) {
 export default function Nav() {
   const { data } = useSession();
   const { me } = useMe();
-  const shopHost = isShopHost();
+
+  // The shop host is a STANDALONE storefront: its own brand, a quiet link
+  // back to the main site, and nothing else pulling attention away from the
+  // goods. (Admins still get their manage entry point.)
+  if (isShopHost()) {
+    return (
+      <header className="nav">
+        <div className="nav-inner">
+          <a className="nav-brand" href="/">
+            BANK OF SOL <span className="nav-brand-sub">SHOP</span>
+          </a>
+          <nav className="nav-links" aria-label="Main" />
+          <div className="nav-auth">
+            {me?.isAdmin && (
+              <a className="nav-link" href="/?view=manage">
+                Manage
+              </a>
+            )}
+            <a className="nav-link" href={mainSiteUrl("/")}>
+              bankofsol.app →
+            </a>
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="nav">
       <div className="nav-inner">
-        {shopHost ? (
-          <a className="nav-brand" href="/">
-            BANK OF SOL <span className="nav-brand-sub">SHOP</span>
-          </a>
-        ) : (
-          <Link className="nav-brand" to="/">
-            BANK OF SOL
-          </Link>
-        )}
+        <Link className="nav-brand" to="/">
+          BANK OF SOL
+        </Link>
         <nav className="nav-links" aria-label="Main">
           <SiteLink to="/membership">Membership</SiteLink>
           <SiteLink to="/consulting">Consulting</SiteLink>
           <SiteLink to="/book">Book time</SiteLink>
-          {shopHost ? (
-            <NavLink to="/" end className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
-              Shop
-            </NavLink>
-          ) : (
-            <SiteLink to="/shop">Shop</SiteLink>
-          )}
           {me?.isAdmin && <SiteLink to="/admin">Admin</SiteLink>}
         </nav>
         <div className="nav-auth">

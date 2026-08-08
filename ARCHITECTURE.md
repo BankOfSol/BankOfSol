@@ -24,8 +24,13 @@ next session has to rediscover. (Discipline inherited from PoundPlay, which prov
   every build, so it survives `rm -rf dist`. Never delete it.
 - **Domains**: `bankofsol.app`, `www.`, `shop.` — all `custom_domain` routes on the one
   Worker (created on deploy; the zone must exist in the account first). The SPA is
-  host-aware (`src/lib/host.js`): the shop subdomain renders the storefront at `/`;
-  every other path is identical on all hosts.
+  host-aware (`src/lib/host.js`), and **the shop is a STANDALONE storefront**
+  (2026-08-08): shop.bankofsol.app serves ONLY the store (`/` + `/shop/:id`; its own
+  minimal chrome; any other path client-redirects to the apex), the main site
+  doesn't feature the shop anywhere (no nav/home links; `/shop*` on the apex
+  client-forwards to the subdomain), and only local dev — which has no subdomains —
+  renders the shop inline at `/shop`. Admin manages it at
+  `shop.bankofsol.app/?view=manage` (the cross-subdomain session carries).
 - **Local dev**: `npm run cf:dev` (build + `wrangler dev`, port 8788) with `.dev.vars`
   (copy from `.dev.vars.example`). UI-only HMR: `npm run dev` (:5173, proxies /api).
 - **Starter content**: `scripts/seed-starter.sql` (`npm run db:seed` /
@@ -192,6 +197,10 @@ Solana Pay merchant checkout (raw JSON-RPC, no SDK). Full plan:
 
 ## Changelog
 
+- **2026-08-08** — **Shop separated from the main site.** shop.bankofsol.app is now a
+  standalone storefront (own minimal chrome, non-shop paths bounce to the apex) for
+  things Sol makes outside POUND; the main site no longer links or routes to it
+  (apex `/shop*` forwards to the subdomain; inline only in local dev). Deployed.
 - **2026-08-08** — **The pivot: member platform + billing ledger.** Public site
   de-crypto'd (custody/vault marketing removed; /custody 301s to /membership;
   meta/JSON-LD/Terms/Privacy/footer rewritten — front recruits members, crypto
