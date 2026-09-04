@@ -23,6 +23,8 @@ import SuperAdmin from "./pages/SuperAdmin.jsx";
 import Terms from "./pages/Terms.jsx";
 import Privacy from "./pages/Privacy.jsx";
 import SolAndRay from "./pages/SolAndRay.jsx";
+import SolRayPrivacy from "./pages/SolRayPrivacy.jsx";
+import SolRaySearchlight from "./pages/SolRaySearchlight.jsx";
 
 function Protected({ children }) {
   const { data, isPending } = useSession();
@@ -81,7 +83,10 @@ export default function App() {
   if (isSolRayHost()) {
     return (
       <Routes>
-        <Route path="*" element={<SolAndRay />} />
+        <Route path="/" element={<SolAndRay />} />
+        <Route path="/privacy" element={<SolRayPrivacy />} />
+        <Route path="/searchlight" element={<SolRaySearchlight />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
   }
@@ -90,7 +95,9 @@ export default function App() {
     return (
       <Routes>
         <Route path="/sol-and-ray" element={<SolAndRay />} />
-        <Route path="/solandray" element={<Navigate to="/sol-and-ray" replace />} />
+        <Route path="/sol-and-ray/privacy" element={<SolRayPrivacy />} />
+        <Route path="/sol-and-ray/searchlight" element={<SolRaySearchlight />} />
+        <Route path="/solandray/*" element={<Navigate to="/sol-and-ray" replace />} />
         <Route path="*" element={<Navigate to="/sol-and-ray" replace />} />
       </Routes>
     );

@@ -33,3 +33,7 @@ export const shopSiteUrl = (path = "/") => {
 export const isSolRayHost = () =>
   typeof window !== "undefined" &&
   /(^|\.)(solandray\.com|solray\.co)$/.test(window.location.hostname);
+
+// Sol & Ray internal paths: bare on its own host, prefixed on the apex.
+export const srPath = (path = "/") =>
+  isSolRayHost() ? path : `/sol-and-ray${path === "/" ? "" : path}`;

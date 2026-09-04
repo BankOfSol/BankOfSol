@@ -211,6 +211,20 @@ Solana Pay merchant checkout (raw JSON-RPC, no SDK). Full plan:
 
 ## Changelog
 
+- **2026-09-04** — **Sol & Ray: review pass, savings estimator, privacy notice, Searchlight
+  page.** Fixes from review: anchors no longer hide under the sticky header
+  (`scroll-margin-top`), skip link, visible focus, reduced-motion guard, client-side
+  validation before POST, `aria-live` on form errors, example call labeled as
+  illustrative, ordered list for the steps. New: interactive savings estimator
+  (`SrSavings.jsx`, formula printed, defaults labeled assumptions); shared chrome
+  (`SrChrome.jsx`); `/sol-and-ray/privacy` written to B&P § 22575 (CalOPPA) plus an
+  accessibility statement (DOJ 2024 ADA Title II rule → WCAG 2.1 AA); the pilot form
+  links it. `/sol-and-ray/searchlight` is the Twilio AI Startup Searchlight slice
+  (story/persona/outcome, AI decision moment, inline-SVG architecture diagram, the four
+  judging criteria, path to production, credits math at Twilio's published US rates,
+  `DEMO_URL` const). Same three routes on the solandray.com host as `/`, `/privacy`,
+  `/searchlight`. No API or schema change.
+
 - **2026-09-04** — **Sol & Ray landing page + lead queue.** New product line
   (AI reference-check assistant for school-district hiring offices) gets its own
   page at `/sol-and-ray` (`/solandray` redirects) with its own light chrome — the

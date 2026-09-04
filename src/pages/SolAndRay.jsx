@@ -1,15 +1,16 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../lib/api.js";
 import usePageMeta from "../lib/usePageMeta.js";
-import { isSolRayHost } from "../lib/host.js";
+import { srPath } from "../lib/host.js";
+import { SrHeader, SrFooter, SR_CONTACT_EMAIL } from "../components/SrChrome.jsx";
+import SrSavings from "../components/SrSavings.jsx";
 
 // Sol & Ray — the landing page for a product line with its own audience:
 // Personnel Commissions and HR offices at California school districts. One
 // job: turn a director's "could this work here?" into a pilot request. Every
 // claim on this page is one the product can keep (see the legal packet's
 // security one-pager); no vendor names, no numbers we haven't verified.
-
-const CONTACT_EMAIL = "Kaasi.serrano@gmail.com";
 
 const STEPS = [
   ["Your questions, unchanged", "Your analyst loads the candidate, the references they listed, and your own reference questions. Ray never adds questions of its own."],
@@ -38,15 +39,11 @@ const SECURITY = [
   ["Encrypted, US-only", "Encrypted in transit and at rest; recordings and transcripts stay in United States regions."],
   ["Deleted on schedule", "Recordings deleted after 30 days. Everything deleted within 30 days of contract end, confirmed in writing."],
   ["Disclosures built in", "AI-voice notice, recording notice, and a live introduction on every call. Candidate authorization collected before any reference is contacted."],
-  ["Written commitments", "A security one-pager and a data-processing agreement, ready for your IT and legal review before the pilot starts."],
+  ["Accessible by design", "Built to WCAG 2.1 AA, the standard the ADA now sets for public-entity web content, with a conformance report available during procurement."],
 ];
 
-const VOLUMES = [
-  "Not sure yet",
-  "Under 10 hires a month",
-  "10 to 30 hires a month",
-  "More than 30 hires a month",
-];
+const VOLUMES = ["Not sure yet", "Under 10 hires a month", "10 to 30 hires a month", "More than 30 hires a month"];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 function PilotForm() {
   const [form, setForm] = useState({ name: "", title: "", org: "", email: "", phone: "", volume: "", message: "", website: "" });
@@ -55,6 +52,9 @@ function PilotForm() {
 
   const submit = async (e) => {
     e.preventDefault();
+    if (!form.name.trim()) return setState({ busy: false, error: "Please tell us your name.", done: false });
+    if (!form.org.trim()) return setState({ busy: false, error: "Please tell us your district or agency.", done: false });
+    if (!EMAIL_RE.test(form.email.trim())) return setState({ busy: false, error: "Please enter a work email we can reply to.", done: false });
     setState({ busy: true, error: "", done: false });
     try {
       await api.solrayPilotRequest(form);
@@ -66,12 +66,12 @@ function PilotForm() {
 
   if (state.done) {
     return (
-      <div className="sr-form sr-done" id="pilot">
+      <div className="sr-form sr-done" id="pilot" role="status">
         <h3>Request received.</h3>
-        <p className="muted" style={{ color: "var(--sr-dim)" }}>
+        <p className="sr-dim">
           Isaak will reply personally within two business days with a short call
           time and the security one-pager. A confirmation is on its way to{" "}
-          <strong style={{ color: "var(--sr-ink)" }}>{form.email}</strong>.
+          <strong className="sr-strong">{form.email}</strong>.
         </p>
       </div>
     );
@@ -123,13 +123,14 @@ function PilotForm() {
         <label htmlFor="sr-website">Website</label>
         <input id="sr-website" tabIndex={-1} autoComplete="off" value={form.website} onChange={set("website")} />
       </div>
-      {state.error && <div className="form-result error">{state.error}</div>}
+      <div aria-live="assertive">{state.error && <div className="form-result error">{state.error}</div>}</div>
       <button className="btn btn-primary btn-lg btn-block" type="submit" disabled={state.busy}>
         {state.busy ? "Sending…" : "Request a pilot conversation"}
       </button>
       <p className="sr-fine">
-        No commitment. You get a reply from a person, the security one-pager, and
-        a 20-minute call if you want one. We never add you to a list.
+        We use what you enter only to reply about a pilot. No lists, no
+        trackers, no sharing. See our{" "}
+        <Link to={srPath("/privacy")}>privacy notice</Link>.
       </p>
     </form>
   );
@@ -141,26 +142,19 @@ export default function SolAndRay() {
     description:
       "Ray is an AI assistant that runs reference checks for school-district hiring offices: references opt in, Ray calls and records the answers word for word, your staff decide. Pilots for California Personnel Commissions.",
   });
-  const home = isSolRayHost() ? "/" : "/sol-and-ray";
 
   return (
     <div className="sr">
-      <header className="sr-nav">
-        <div className="sr-wrap sr-nav-inner">
-          <a className="sr-brand" href={home}>
-            SOL &amp; RAY
-            <small>Reference checks for public-agency hiring</small>
-          </a>
-          <nav className="sr-nav-links" aria-label="Sol & Ray">
-            <a className="sr-nav-link sr-hide-sm" href="#how">How it works</a>
-            <a className="sr-nav-link sr-hide-sm" href="#security">Security</a>
-            <a className="sr-nav-link sr-hide-sm" href="#pilot-offer">Pilot</a>
-            <a className="btn btn-primary btn-sm" href="#pilot">Request a pilot</a>
-          </nav>
-        </div>
-      </header>
+      <SrHeader
+        links={[
+          { href: "#how", label: "How it works" },
+          { href: "#savings", label: "Savings" },
+          { href: "#security", label: "Security" },
+        ]}
+        cta={{ href: "#pilot", label: "Request a pilot" }}
+      />
 
-      <main>
+      <main id="main">
         <section className="sr-wrap sr-hero">
           <div>
             <div className="sr-eyebrow">For Personnel Commissions and HR offices</div>
@@ -177,7 +171,7 @@ export default function SolAndRay() {
             </p>
             <div className="lp-actions">
               <a className="btn btn-primary btn-lg" href="#pilot">Request a pilot</a>
-              <a className="btn btn-outline btn-lg" href="#how">See how a call works</a>
+              <a className="btn btn-outline btn-lg" href="#savings">See what it saves</a>
             </div>
             <p className="sr-note">
               Built for California merit-system districts. 60 to 90 day pilots,
@@ -187,7 +181,7 @@ export default function SolAndRay() {
 
           <div className="sr-call" aria-label="Example of one reference call">
             <div className="sr-call-head">
-              <span>One reference call</span>
+              <span>Example call</span>
               <span className="sr-live">Opted in · recorded</span>
             </div>
             <div className="sr-line sr-ray">
@@ -207,7 +201,7 @@ export default function SolAndRay() {
               <span>I supervised her for three years as a lead custodian at…</span>
             </div>
             <div className="sr-call-foot">
-              Answers are transcribed verbatim and delivered to the Personnel Director's queue. No summary, no score.
+              Names are illustrative. Answers are transcribed verbatim and delivered to the Personnel Director's queue. No summary, no score.
             </div>
           </div>
         </section>
@@ -221,15 +215,28 @@ export default function SolAndRay() {
               every call already has the consent that California and federal
               calling and recording rules require.
             </p>
-            <div className="sr-steps">
+            <ol className="sr-steps">
               {STEPS.map(([t, b], i) => (
-                <div className="sr-step" key={t}>
-                  <span className="sr-step-n">{i + 1}</span>
+                <li className="sr-step" key={t}>
+                  <span className="sr-step-n" aria-hidden="true">{i + 1}</span>
                   <h3>{t}</h3>
                   <p>{b}</p>
-                </div>
+                </li>
               ))}
-            </div>
+            </ol>
+          </div>
+        </section>
+
+        <section className="sr-section" id="savings">
+          <div className="sr-wrap">
+            <div className="sr-kicker">What it saves</div>
+            <h2>Put your own numbers in.</h2>
+            <p className="sr-intro">
+              Reference checks cost analyst hours, and the cost hides because it
+              is spread across every hire. Slide the inputs to your district's
+              volume and see the hours and dollars that go to phone tag today.
+            </p>
+            <SrSavings />
           </div>
         </section>
 
@@ -238,10 +245,10 @@ export default function SolAndRay() {
             <div className="sr-kicker">Scope</div>
             <h2>What Ray does, and what it will never do.</h2>
             <div className="sr-two" style={{ marginTop: 26 }}>
-              <ul className="sr-list sr-yes">
+              <ul className="sr-list sr-yes" aria-label="What Ray does">
                 {YES.map(([t, b]) => (
                   <li key={t}>
-                    <span>✓</span>
+                    <span aria-hidden="true">✓</span>
                     <span>
                       {t}
                       <small>{b}</small>
@@ -249,10 +256,10 @@ export default function SolAndRay() {
                   </li>
                 ))}
               </ul>
-              <ul className="sr-list sr-no">
+              <ul className="sr-list sr-no" aria-label="What Ray never does">
                 {NO.map(([t, b]) => (
                   <li key={t}>
-                    <span>✕</span>
+                    <span aria-hidden="true">✕</span>
                     <span>
                       {t}
                       <small>{b}</small>
@@ -288,7 +295,7 @@ export default function SolAndRay() {
           <div className="sr-wrap">
             <div className="sr-band">
               <div>
-                <div className="sr-kicker" style={{ color: "var(--gold)" }}>The pilot</div>
+                <div className="sr-kicker sr-kicker-gold">The pilot</div>
                 <h2>One or two classifications. Sixty to ninety days. Real numbers.</h2>
                 <p>
                   Pick your highest-volume classified roles. We configure your
@@ -299,22 +306,10 @@ export default function SolAndRay() {
                 </p>
               </div>
               <div className="sr-band-facts">
-                <div className="sr-fact">
-                  <b>References reached</b>
-                  <span>and checks completed per candidate</span>
-                </div>
-                <div className="sr-fact">
-                  <b>Days from eligibility to a finished check</b>
-                  <span>median, before and during</span>
-                </div>
-                <div className="sr-fact">
-                  <b>Analyst hours returned</b>
-                  <span>per week, measured together</span>
-                </div>
-                <div className="sr-fact">
-                  <b>Consent and disclosure</b>
-                  <span>100% of calls, on the record</span>
-                </div>
+                <div className="sr-fact"><b>References reached</b><span>and checks completed per candidate</span></div>
+                <div className="sr-fact"><b>Days from eligibility to a finished check</b><span>median, before and during</span></div>
+                <div className="sr-fact"><b>Analyst hours returned</b><span>per week, measured together</span></div>
+                <div className="sr-fact"><b>Consent and disclosure</b><span>100% of calls, on the record</span></div>
               </div>
             </div>
           </div>
@@ -332,8 +327,7 @@ export default function SolAndRay() {
                 call with whoever needs to be in the room.
               </p>
               <p className="sr-intro">
-                Prefer email? Write to{" "}
-                <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
+                Prefer email? Write to <a href={`mailto:${SR_CONTACT_EMAIL}`}>{SR_CONTACT_EMAIL}</a>.
               </p>
             </div>
             <PilotForm />
@@ -341,23 +335,7 @@ export default function SolAndRay() {
         </section>
       </main>
 
-      <footer className="sr-footer">
-        <div className="sr-wrap">
-          <div className="sr-footer-links">
-            <a href="#how">How it works</a>
-            <a href="#security">Security</a>
-            <a href={`mailto:${CONTACT_EMAIL}`}>Contact</a>
-            <a href="https://bankofsol.app/">Bank of Sol</a>
-          </div>
-          <p>
-            Sol &amp; Ray builds software that reduces friction and enables
-            control in public-agency operations. Ray is a software product; every
-            employment decision stays with the district's staff. Sol &amp; Ray
-            operates from California and is a product line of Bank of Sol.
-          </p>
-          <p>© {new Date().getFullYear()} Sol &amp; Ray</p>
-        </div>
-      </footer>
+      <SrFooter />
     </div>
   );
 }
