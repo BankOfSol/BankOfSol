@@ -1031,3 +1031,131 @@ table.list td {
   background-clip: text;
   color: transparent;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SOL & RAY — product-line landing page (/sol-and-ray, solandray.com).
+   A different audience (school-district HR and IT reviewers), so a different
+   surface: warm paper, deep navy ink, one restrained gold accent. Scoped under
+   .sr so nothing here leaks into the Bank of Sol pages.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.sr {
+  --sr-bg: #faf8f3;
+  --sr-bg2: #f1ede4;
+  --sr-panel: #ffffff;
+  --sr-line: #e3ded2;
+  --sr-ink: #17212e;
+  --sr-dim: #5d6774;
+  --sr-accent: #9a6b00;      /* deep sun gold on paper */
+  --sr-accent-soft: #fbf1d6;
+  --sr-green: #157a55;
+  --sr-green-soft: #e3f3ea;
+  --sr-red: #b3261e;
+  --sr-red-soft: #fbe6e4;
+  min-height: 100vh;
+  background: var(--sr-bg);
+  color: var(--sr-ink);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+.sr a { color: var(--sr-accent); }
+.sr a:hover { color: var(--sr-ink); }
+.sr h1, .sr h2, .sr h3 { color: var(--sr-ink); }
+.sr .sr-wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+
+/* Header */
+.sr-nav { position: sticky; top: 0; z-index: 20; background: rgba(250, 248, 243, 0.92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--sr-line); }
+.sr-nav-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 62px; }
+.sr-brand { font-weight: 900; letter-spacing: 0.1em; font-size: 0.95rem; color: var(--sr-ink); }
+.sr-brand:hover { color: var(--sr-accent); }
+.sr-brand small { display: block; font-weight: 600; letter-spacing: 0.04em; font-size: 0.68rem; color: var(--sr-dim); margin-top: 1px; }
+.sr-nav-links { display: flex; gap: 6px; align-items: center; }
+.sr-nav-link { color: var(--sr-dim); font-weight: 600; font-size: 0.92rem; padding: 7px 10px; border-radius: var(--radius-sm); }
+.sr-nav-link:hover { color: var(--sr-ink); background: var(--sr-bg2); }
+@media (max-width: 640px) { .sr-nav-link.sr-hide-sm { display: none; } }
+
+/* Buttons on paper */
+.sr .btn { border-color: transparent; }
+.sr .btn-primary { background: var(--sr-ink); color: #fff; }
+.sr .btn-primary:hover { background: #24344a; color: #fff; }
+.sr .btn-outline { background: transparent; color: var(--sr-ink); border: 1px solid var(--sr-line); }
+.sr .btn-outline:hover { border-color: var(--sr-ink); color: var(--sr-ink); }
+
+/* Hero */
+.sr-hero { padding: 76px 0 52px; display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 48px; align-items: center; }
+.sr-eyebrow { color: var(--sr-accent); font-weight: 700; letter-spacing: 0.2em; font-size: 0.72rem; text-transform: uppercase; margin-bottom: 18px; }
+.sr-title { font-size: clamp(2.1rem, 5.4vw, 3.5rem); line-height: 1.05; letter-spacing: -0.03em; margin: 0 0 20px; }
+.sr-title em { font-style: normal; color: var(--sr-accent); }
+.sr-lede { color: var(--sr-dim); font-size: clamp(1.02rem, 2vw, 1.18rem); max-width: 540px; margin: 0 0 28px; }
+.sr-note { color: var(--sr-dim); font-size: 0.86rem; margin: 18px 0 0; max-width: 480px; }
+
+/* The call card — a plain depiction of one call, not a screenshot */
+.sr-call { background: var(--sr-panel); border: 1px solid var(--sr-line); border-radius: 14px; padding: 22px; box-shadow: 0 14px 40px rgba(23, 33, 46, 0.08); }
+.sr-call-head { display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; color: var(--sr-dim); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 14px; }
+.sr-call-head .sr-live { color: var(--sr-green); }
+.sr-line { display: grid; grid-template-columns: 58px 1fr; gap: 10px; padding: 9px 0; border-top: 1px dashed var(--sr-line); font-size: 0.93rem; }
+.sr-line:first-of-type { border-top: none; }
+.sr-line b { color: var(--sr-dim); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; padding-top: 3px; }
+.sr-line.sr-ray b { color: var(--sr-accent); }
+.sr-call-foot { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--sr-line); color: var(--sr-dim); font-size: 0.8rem; }
+
+/* Sections */
+.sr-section { padding: 60px 0; border-top: 1px solid var(--sr-line); }
+.sr-kicker { color: var(--sr-accent); font-weight: 700; letter-spacing: 0.18em; font-size: 0.72rem; text-transform: uppercase; margin-bottom: 12px; }
+.sr-section h2 { font-size: clamp(1.5rem, 3.2vw, 2.1rem); letter-spacing: -0.02em; margin: 0 0 12px; max-width: 640px; }
+.sr-section > .sr-wrap > p.sr-intro { color: var(--sr-dim); max-width: 620px; margin: 0 0 30px; }
+
+.sr-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 22px; }
+.sr-step { background: var(--sr-panel); border: 1px solid var(--sr-line); border-radius: 12px; padding: 20px; }
+.sr-step-n { display: inline-flex; width: 28px; height: 28px; border-radius: 50%; align-items: center; justify-content: center; background: var(--sr-accent-soft); color: var(--sr-accent); font-weight: 800; font-size: 0.8rem; margin-bottom: 10px; }
+.sr-step h3 { margin: 0 0 6px; font-size: 1.02rem; }
+.sr-step p { margin: 0; color: var(--sr-dim); font-size: 0.93rem; }
+
+.sr-two { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+.sr-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.sr-list li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; color: var(--sr-ink); }
+.sr-list li span:first-child { font-weight: 800; }
+.sr-list.sr-yes li span:first-child { color: var(--sr-green); }
+.sr-list.sr-no li span:first-child { color: var(--sr-red); }
+.sr-list li small { display: block; color: var(--sr-dim); }
+
+.sr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px; }
+.sr-cell { border-top: 2px solid var(--sr-ink); padding-top: 12px; }
+.sr-cell h3 { margin: 0 0 6px; font-size: 1rem; }
+.sr-cell p { margin: 0; color: var(--sr-dim); font-size: 0.92rem; }
+
+.sr-band { background: var(--sr-ink); color: #f3f1ec; border-radius: 16px; padding: 40px 36px; display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 32px; align-items: center; }
+.sr-band h2 { color: #fff; margin: 0 0 10px; }
+.sr-band p { color: #c8cdd6; margin: 0; }
+.sr-band .sr-band-facts { display: grid; gap: 10px; }
+.sr-fact { border-left: 2px solid var(--gold); padding-left: 12px; }
+.sr-fact b { display: block; color: #fff; }
+.sr-fact span { color: #c8cdd6; font-size: 0.9rem; }
+
+/* Form */
+.sr-form-wrap { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 40px; align-items: start; }
+.sr-form { background: var(--sr-panel); border: 1px solid var(--sr-line); border-radius: 14px; padding: 26px; }
+.sr-form .form-field label { color: var(--sr-ink); font-weight: 600; font-size: 0.9rem; }
+.sr-form input, .sr-form select, .sr-form textarea { background: #fff; color: var(--sr-ink); border: 1px solid var(--sr-line); }
+.sr-form input:focus, .sr-form select:focus, .sr-form textarea:focus { border-color: var(--sr-ink); box-shadow: 0 0 0 3px rgba(23, 33, 46, 0.08); }
+.sr-form .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sr-form .form-result.success { background: var(--sr-green-soft); color: var(--sr-green); }
+.sr-form .form-result.error { background: var(--sr-red-soft); color: var(--sr-red); }
+.sr-form .sr-fine { color: var(--sr-dim); font-size: 0.8rem; margin: 12px 0 0; }
+.sr-hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.sr-done { text-align: left; }
+.sr-done h3 { margin: 0 0 8px; }
+
+/* Footer */
+.sr-footer { border-top: 1px solid var(--sr-line); background: var(--sr-bg2); padding: 32px 0 40px; margin-top: 40px; color: var(--sr-dim); font-size: 0.88rem; }
+.sr-footer-links { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 12px; }
+.sr-footer p { margin: 6px 0 0; max-width: 720px; }
+
+@media (max-width: 800px) {
+  .sr-hero { grid-template-columns: 1fr; padding: 52px 0 40px; gap: 32px; }
+  .sr-two, .sr-band, .sr-form-wrap { grid-template-columns: 1fr; }
+  .sr-band { padding: 30px 24px; }
+}
+@media (max-width: 480px) {
+  .sr-form .form-row { grid-template-columns: 1fr; }
+  .sr-form { padding: 20px 16px; }
+}

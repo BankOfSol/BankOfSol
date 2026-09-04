@@ -26,3 +26,10 @@ export const shopSiteUrl = (path = "/") => {
   if (isLocalDev()) return path === "/" ? "/shop" : `/shop${path}`;
   return `https://shop.${window.location.hostname.replace(/^www\./, "")}${path}`;
 };
+
+// solandray.com / solray.co — the Sol & Ray product line, served by this same
+// Worker once those zones are attached (wrangler.jsonc routes). On that host
+// only the Sol & Ray landing page renders. On the apex it lives at /sol-and-ray.
+export const isSolRayHost = () =>
+  typeof window !== "undefined" &&
+  /(^|\.)(solandray\.com|solray\.co)$/.test(window.location.hostname);

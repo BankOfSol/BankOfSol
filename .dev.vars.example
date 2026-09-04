@@ -24,6 +24,8 @@ STRIPE_WEBHOOK_SECRET=""
 # sent. That's the intended local default.
 MAIL_FROM="sol@bankofsol.app"
 MAIL_FROM_NAME="Bank of Sol"
+# Sol & Ray pilot requests go here (falls back to ADMIN_EMAIL).
+SOLRAY_NOTIFY_EMAIL="Kaasi.serrano@gmail.com"
 
 # ── Phase 2: Slant 3D print fulfillment ─────────────────────────────────────
 # Blank = manual-fulfillment mode (print features disabled, shop unaffected).

@@ -54,7 +54,18 @@ const DISCLAIMER =
  * Wraps body content in the Bank of Sol shell: dark card, gold header rule,
  * gold CTA button, disclosure + disclaimer footer on every send.
  */
-function layout({ heading, bodyHtml, bodyText, cta, accent = GOLD }) {
+function layout({
+  heading,
+  bodyHtml,
+  bodyText,
+  cta,
+  accent = GOLD,
+  // Product-line branding for the header + site link. Everything else in the
+  // shell (disclosure, not-a-bank line, sender) stays Bank of Sol's.
+  brand = "BANK OF SOL",
+  site = "https://bankofsol.app",
+  siteLabel = "bankofsol.app",
+}) {
   const button = cta
     ? `<tr><td align="center" style="padding:8px 0 4px;">
          <a href="${cta.url}" bgcolor="${accent}" style="display:inline-block;background:${accent};color:${BLACK};font-family:${FONT};font-size:16px;font-weight:800;text-decoration:none;padding:14px 32px;border-radius:8px;letter-spacing:.02em;">${escapeHtml(cta.label)}</a>
@@ -80,7 +91,7 @@ function layout({ heading, bodyHtml, bodyText, cta, accent = GOLD }) {
  <tr><td align="center">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${CARD}" style="max-width:560px;background:${CARD};border:1px solid ${LINE};border-radius:12px;overflow:hidden;">
    <tr><td bgcolor="${BLACK}" style="background:${BLACK};border-bottom:3px solid ${GOLD};padding:18px 24px;">
-     <span style="font-family:${FONT};font-size:22px;font-weight:900;color:${GOLD};letter-spacing:.08em;">BANK OF SOL</span>
+     <span style="font-family:${FONT};font-size:22px;font-weight:900;color:${GOLD};letter-spacing:.08em;">${escapeHtml(brand)}</span>
    </td></tr>
    <tr><td style="padding:28px 24px 8px;">
      <h1 style="margin:0 0 14px;font-family:${FONT};font-size:22px;font-weight:900;color:${INK};line-height:1.25;">${escapeHtml(heading)}</h1>
@@ -92,7 +103,7 @@ function layout({ heading, bodyHtml, bodyText, cta, accent = GOLD }) {
    <tr><td bgcolor="${FOOT}" style="background:${FOOT};border-top:1px solid ${LINE};padding:16px 24px;font-family:${FONT};font-size:12px;line-height:1.6;color:${DIM};">
      ${escapeHtml(DISCLOSURE)}<br>
      ${escapeHtml(DISCLAIMER)}<br>
-     <a href="https://bankofsol.app" style="color:${GOLD};font-weight:700;text-decoration:none;">bankofsol.app</a>
+     <a href="${site}" style="color:${GOLD};font-weight:700;text-decoration:none;">${escapeHtml(siteLabel)}</a>
    </td></tr>
   </table>
  </td></tr>
@@ -100,7 +111,7 @@ function layout({ heading, bodyHtml, bodyText, cta, accent = GOLD }) {
 </body></html>`;
 
   const text = [
-    "BANK OF SOL",
+    brand,
     "",
     heading,
     "",
@@ -110,7 +121,7 @@ function layout({ heading, bodyHtml, bodyText, cta, accent = GOLD }) {
     "—",
     DISCLOSURE,
     DISCLAIMER,
-    "https://bankofsol.app",
+    site,
   ].join("\n");
 
   return { html, text };
@@ -399,4 +410,44 @@ export function sendAdminNotice(env, subject, lines, kind = "admin-notice") {
     bodyHtml: `<p>${bodyText.split("\n").map(escapeHtml).join("<br>")}</p>`,
     bodyText,
   }, { kind });
+}
+
+// ── Sol & Ray (pilot requests from the landing page) ────────────────────────
+// Same shell, Sol & Ray header. The sender is still sol@bankofsol.app and the
+// footer still carries the disclosure + not-a-bank line (rule 2).
+
+const SOLRAY = { brand: "SOL & RAY", site: "https://solandray.com", siteLabel: "solandray.com" };
+
+export const sendSolrayLeadReceived = (env, lead) =>
+  send(env, lead.email, {
+    ...SOLRAY,
+    subject: "We got your pilot request — Sol & Ray",
+    heading: `Thanks, ${escapeHtml(firstName({ name: lead.name }))}.`,
+    bodyHtml: `<p>Your pilot request for <strong>${escapeHtml(lead.org)}</strong> is in. Isaak will reply personally within two business days with a short call time and the security one-pager.</p><p>Nothing is scheduled or committed yet — this is a conversation first.</p>`,
+    bodyText: `Your pilot request for ${lead.org} is in. Isaak will reply personally within two business days with a short call time and the security one-pager.\n\nNothing is scheduled or committed yet — this is a conversation first.`,
+  }, { kind: "solray-lead-received" });
+
+// Notice to the founder inbox. SOLRAY_NOTIFY_EMAIL (wrangler.jsonc vars)
+// overrides ADMIN_EMAIL so Sol & Ray leads reach the address Sol asked for.
+export function sendSolrayLeadNotice(env, lead) {
+  const to = env.SOLRAY_NOTIFY_EMAIL || env.ADMIN_EMAIL;
+  const lines = [
+    `Name: ${lead.name}${lead.title ? ` (${lead.title})` : ""}`,
+    `Organization: ${lead.org}`,
+    `Email: ${lead.email}`,
+    `Phone: ${lead.phone || "—"}`,
+    `Volume: ${lead.volume || "—"}`,
+    `From: ${lead.source || "—"}`,
+    "",
+    lead.message || "(no message)",
+  ];
+  const bodyText = lines.join("\n");
+  return send(env, to, {
+    ...SOLRAY,
+    subject: `Pilot request: ${lead.org} — Sol & Ray`,
+    heading: `New pilot request from ${lead.org}`,
+    bodyHtml: `<p>${lines.map(escapeHtml).join("<br>")}</p>`,
+    bodyText,
+    cta: { label: "Open the lead queue", url: "https://bankofsol.app/admin" },
+  }, { kind: "solray-lead-notice" });
 }

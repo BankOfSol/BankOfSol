@@ -7,6 +7,7 @@ import AdminMembers from "../components/AdminMembers.jsx";
 import MembershipQueueAdmin from "../components/MembershipQueueAdmin.jsx";
 import BookingAdmin from "../components/BookingAdmin.jsx";
 import AvailabilityEditor from "../components/AvailabilityEditor.jsx";
+import SolrayLeadsAdmin from "../components/SolrayLeadsAdmin.jsx";
 import usePageMeta from "../lib/usePageMeta.js";
 
 function EmailLog() {
@@ -60,6 +61,7 @@ const TABS = [
   { key: "bookings", label: "📅 Bookings" },
   { key: "availability", label: "🗓 Availability" },
   { key: "shop", label: "🛒 Shop" },
+  { key: "leads", label: "☎️ Sol & Ray leads" },
   { key: "email", label: "✉️ Email log" },
 ];
 
@@ -91,6 +93,7 @@ export default function Admin() {
     applications: counts.membershipApplied,
     bookings: counts.upcomingBookings,
     shop: counts.paidOrders,
+    leads: counts.solrayLeads,
   };
 
   return (
@@ -134,6 +137,7 @@ export default function Admin() {
           </a>
         </div>
       )}
+      {tab === "leads" && <SolrayLeadsAdmin onChanged={loadCounts} />}
       {tab === "email" && <EmailLog />}
     </div>
   );

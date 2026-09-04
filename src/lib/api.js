@@ -124,6 +124,16 @@ export const api = {
   saveRail: (payload) => post("/api/superadmin/rails", payload),
   deleteRail: (id) => req(`/api/superadmin/rails?id=${id}`, { method: "DELETE" }),
 
+  // ── Sol & Ray (public pilot requests + admin queue) ───────────────────────
+  solrayPilotRequest: (payload) =>
+    post("/api/solray/pilot-request", {
+      ...payload,
+      source: window.location.host + window.location.pathname,
+    }),
+  adminSolrayLeads: (status = "all") => req(`/api/admin/solray/leads?status=${status}`),
+  adminSolrayLeadAction: (id, status, adminNote) =>
+    post("/api/admin/solray/leads", { id, status, ...(adminNote !== undefined ? { adminNote } : {}) }),
+
   // ── Admin misc ────────────────────────────────────────────────────────────
   adminCounts: () => req("/api/admin/counts"),
   emailLog: (params = {}) =>

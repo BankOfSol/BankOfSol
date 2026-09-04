@@ -54,6 +54,10 @@ Account: `Kaasi.serrano@gmail.com's Account` (`568986ebd89d7e53c2666c4dd94b676b`
 | `EMAIL` | service | `bankofsol-mailer` | in the mailer itself, `EMAIL` is the real `send_email` binding — same call shape (`env.EMAIL.send({...})`) both places |
 | `ASSETS` | assets | `./dist` | `run_worker_first: ["/api/*"]`, SPA fallback |
 
+Vars (wrangler.jsonc): `BETTER_AUTH_URL`, `ADMIN_EMAIL`, `APP_ORIGINS`, `MAIL_FROM`,
+`MAIL_FROM_NAME`, `SOLRAY_NOTIFY_EMAIL` (where Sol & Ray pilot requests are sent;
+falls back to `ADMIN_EMAIL`).
+
 Vars (wrangler.jsonc): `BETTER_AUTH_URL`, `ADMIN_EMAIL` (= superadmin), `APP_ORIGINS`
 (comma-separated extra trusted origins), `MAIL_FROM`, `MAIL_FROM_NAME`.
 Secrets (`wrangler secret put`): `BETTER_AUTH_SECRET`, `STRIPE_SECRET_KEY`,
@@ -95,6 +99,10 @@ ADMIN_EMAIL (paid orders / bookings / custody applications; silent when empty).
   when Sol CONFIRMS a claim with its USD value), `crypto_rail` (XRP/SOL/BTC/TON
   RECEIVING addresses, superadmin-only, public addresses ever), `engagement`
   (onboarding pipeline), `review` (one per completed booking).
+
+- **0006 solray_lead**: Sol & Ray pilot requests from the landing page (name, title,
+  org, email, phone, volume, message, source, ip for the per-IP cap; status
+  new|contacted|pilot|closed; adminNote). No auth, no money — a plain lead queue.
 
 Money is integer cents everywhere; `parseFloat` is banned in money files. Slots are
 computed on request, never materialized; the atomic primitive is the guarded
@@ -141,7 +149,9 @@ middleware. Admin mutations all `logAdminActivity`.
 | POST `/api/admin/members/engagement` | admin | onboarding pipeline CRUD |
 | GET/POST `/api/admin/members/claims` | admin | pending crypto claims; confirm (with USD value → ledger) / reject |
 | GET/POST/DELETE `/api/superadmin/rails` | superadmin | XRP/SOL/BTC/TON receiving addresses (public only, sanitizer refuses key-shaped input) |
-| GET `/api/admin/counts` · `/api/admin/email-log` | admin | tab badges (incl. pendingClaims/membershipApplied); outbound-mail ledger |
+| GET `/api/admin/counts` · `/api/admin/email-log` | admin | tab badges (incl. pendingClaims/membershipApplied/solrayLeads); outbound-mail ledger |
+| POST `/api/solray/pilot-request` | public+caps | Sol & Ray lead capture: honeypot (`website`), 5/IP/day, length-capped fields → `solray_lead` + two emails (requester confirmation; notice to `SOLRAY_NOTIFY_EMAIL`) |
+| GET/POST `/api/admin/solray/leads` | admin | lead queue (?status=); status/adminNote updates (logAdminActivity) |
 | `/api/superadmin/{admins,activity}` | superadmin | grant/revoke isAdmin (isSuperAdmin NEVER grantable); audit feed |
 
 ## 5 · Auth & roles
@@ -168,6 +178,10 @@ return-path `cf-bounce.bankofsol.app`, tag `77031d818695423299be531b4cbe1cd6`). 
 was auto-provisioned in the Cloudflare-managed zone and verified live: DKIM
 (`cf-bounce._domainkey`), SPF + MX on `cf-bounce`, and `_dmarc` at **`p=reject`**.
 Sender is locked to `sol@bankofsol.app` by the mailer's `allowed_sender_addresses`.
+
+`layout()` takes an optional `brand`/`site`/`siteLabel` so product-line mail (Sol & Ray:
+`sendSolrayLeadReceived`, `sendSolrayLeadNotice`) carries its own header while keeping
+the sender, the automation disclosure, and the not-a-bank line.
 
 ## 7 · Safety invariants (non-negotiable)
 
@@ -196,6 +210,21 @@ Solana Pay merchant checkout (raw JSON-RPC, no SDK). Full plan:
 `/Users/sol/.claude/plans/how-does-a-bank-imperative-sunbeam.md`.
 
 ## Changelog
+
+- **2026-09-04** — **Sol & Ray landing page + lead queue.** New product line
+  (AI reference-check assistant for school-district hiring offices) gets its own
+  page at `/sol-and-ray` (`/solandray` redirects) with its own light chrome — the
+  Bank of Sol nav/footer stay off it — and renders as the whole site on the
+  `solandray.com` / `solray.co` hosts (`isSolRayHost()`; add those zones to
+  `wrangler.jsonc` routes once they are in this Cloudflare account). Lead capture is
+  first-party: `POST /api/solray/pilot-request` (public; honeypot + 5/IP/day) →
+  `solray_lead` (0006) → confirmation to the requester + notice to
+  `SOLRAY_NOTIFY_EMAIL` (Kaasi.serrano@gmail.com), both through email.js with a
+  SOL & RAY header. Admin → "Sol & Ray leads" tab (status + private note; badge =
+  new leads). `usePageMeta` gains `fullTitle`/`description`. Copy mirrors the legal
+  packet in `DATA/DATA/sol-and-ray-legal/` (no vendor names, no unverified figures).
+  Verified locally at desktop + 375px (no overflow); form → 201 → row + 2 email_log
+  rows ok=1. Not yet deployed; remote migration 0006 pending.
 
 - **2026-08-08** — **Shop separated from the main site.** shop.bankofsol.app is now a
   standalone storefront (own minimal chrome, non-shop paths bounce to the apex) for

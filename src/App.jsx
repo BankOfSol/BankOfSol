@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useSession } from "./lib/auth-client.js";
-import { isShopHost, isLocalDev, shopSiteUrl } from "./lib/host.js";
+import { isShopHost, isSolRayHost, isLocalDev, shopSiteUrl } from "./lib/host.js";
 import Nav from "./components/Nav.jsx";
 import Footer from "./components/Footer.jsx";
 import Home from "./pages/Home.jsx";
@@ -22,6 +22,7 @@ import Admin from "./pages/Admin.jsx";
 import SuperAdmin from "./pages/SuperAdmin.jsx";
 import Terms from "./pages/Terms.jsx";
 import Privacy from "./pages/Privacy.jsx";
+import SolAndRay from "./pages/SolAndRay.jsx";
 
 function Protected({ children }) {
   const { data, isPending } = useSession();
@@ -69,7 +70,32 @@ function ShopForward({ children }) {
   return <div className="spinner">Opening the shop…</div>;
 }
 
+// The Sol & Ray landing page brings its own chrome (a different brand for a
+// different audience), so the Bank of Sol nav/footer stay off it.
+const SOLRAY_PATH = /^\/(sol-and-ray|solandray)(\/|$)/;
+
 export default function App() {
+  const location = useLocation();
+
+  // solandray.com / solray.co serve ONLY the Sol & Ray page.
+  if (isSolRayHost()) {
+    return (
+      <Routes>
+        <Route path="*" element={<SolAndRay />} />
+      </Routes>
+    );
+  }
+
+  if (SOLRAY_PATH.test(location.pathname)) {
+    return (
+      <Routes>
+        <Route path="/sol-and-ray" element={<SolAndRay />} />
+        <Route path="/solandray" element={<Navigate to="/sol-and-ray" replace />} />
+        <Route path="*" element={<Navigate to="/sol-and-ray" replace />} />
+      </Routes>
+    );
+  }
+
   // shop.bankofsol.app is a standalone storefront: the store at "/", product
   // pages, nothing else — any other path hops back to the apex.
   if (isShopHost()) {

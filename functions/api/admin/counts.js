@@ -14,7 +14,7 @@ export async function onRequestGet({ request, env }) {
       .catch(() => 0);
 
   const nowIso = new Date().toISOString();
-  const [membershipApplied, upcomingBookings, paidOrders, pendingClaims, openInvoices] =
+  const [membershipApplied, upcomingBookings, paidOrders, pendingClaims, openInvoices, solrayLeads] =
     await Promise.all([
       count(`SELECT COUNT(*) AS n FROM "member_account" WHERE "status" = 'applied'`),
       count(
@@ -24,7 +24,8 @@ export async function onRequestGet({ request, env }) {
       count(`SELECT COUNT(*) AS n FROM "shop_order" WHERE "status" = 'paid'`),
       count(`SELECT COUNT(*) AS n FROM "payment_claim" WHERE "status" = 'pending'`),
       count(`SELECT COUNT(*) AS n FROM "invoice" WHERE "status" IN ('open','partial')`),
+      count(`SELECT COUNT(*) AS n FROM "solray_lead" WHERE "status" = 'new'`),
     ]);
 
-  return json({ membershipApplied, upcomingBookings, paidOrders, pendingClaims, openInvoices });
+  return json({ membershipApplied, upcomingBookings, paidOrders, pendingClaims, openInvoices, solrayLeads });
 }

@@ -69,6 +69,8 @@
     "ADMIN_EMAIL": "kaasi_s@icloud.com",
     "APP_ORIGINS": "",
     "MAIL_FROM": "sol@bankofsol.app",
-    "MAIL_FROM_NAME": "Bank of Sol"
+    "MAIL_FROM_NAME": "Bank of Sol",
+    // Where Sol & Ray pilot requests are sent (falls back to ADMIN_EMAIL).
+    "SOLRAY_NOTIFY_EMAIL": "Kaasi.serrano@gmail.com"
   }
 }
