@@ -1,129 +1,91 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useSession } from "../lib/auth-client.js";
+import { api } from "../lib/api.js";
 import usePageMeta from "../lib/usePageMeta.js";
 
-// The landing page. One job: get the right person onto a call. Everything
-// else on the page exists to answer "can they build my thing?" and then get
-// out of the way — minimal sections, one primary action repeated at the top
-// and bottom.
-const SERVICES = [
-  {
-    n: "01",
-    title: "Web applications",
-    body: "Customer portals, dashboards, storefronts, internal tools. Designed, built, and shipped on modern edge infrastructure — the platform you're reading this on is our own work.",
-  },
-  {
-    n: "02",
-    title: "Financial automation",
-    body: "Invoicing, payments, reconciliation, reporting, and the glue between the tools you already pay for. We take the money paperwork off your desk and make it run itself.",
-  },
-  {
-    n: "03",
-    title: "AI education & consulting",
-    body: "Practical AI in your business, taught in plain language: where it actually helps, what to automate first, and how to put it into production without betting the company on it.",
-  },
-];
-
-const STEPS = [
-  ["Start a call", "Book a slot in a couple of clicks. We talk through what you want built and whether we're the right fit."],
-  ["Get a plan", "You leave with a clear scope, a timeline, and a number — not a vague proposal three weeks later."],
-  ["We build it", "Work runs through your member account: every engagement, invoice, and payment itemized, so you always know where things stand."],
-];
-
+// The whole public site: the sun, a way onto the waitlist, and a way in.
 export default function Home() {
   usePageMeta({});
+  const { data } = useSession();
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [website, setWebsite] = useState(""); // honeypot
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+
+  async function join(e) {
+    e.preventDefault();
+    setResult(null);
+    setBusy(true);
+    try {
+      const r = await api.joinWaitlist({ email, name, website });
+      setResult({ ok: true, text: r.already ? "You're already on the list." : "You're on the list. We'll be in touch." });
+      setEmail("");
+      setName("");
+    } catch (e2) {
+      setResult({ ok: false, text: e2.message });
+    }
+    setBusy(false);
+  }
+
   return (
-    <div className="page lp">
-      <section className="lp-hero">
-        <div className="lp-eyebrow">Bank of Sol</div>
-        <h1 className="lp-title">
-          We build the thing
-          <br />
-          <span className="gold-grad">you keep meaning to build.</span>
-        </h1>
-        <p className="lp-lede">
-          Web applications, financial automation, and AI consulting — built by
-          the people who'll actually be doing the work. Start with a call.
-        </p>
-        <div className="lp-actions">
-          <Link className="btn btn-gold btn-lg" to="/book">
-            Start a call
+    <div className="page sun-page">
+      <div className="sun-wrap">
+        <img className="sun-hero" src="/sun.webp" width="640" height="640" alt="" decoding="async" fetchPriority="high" />
+        {/* POUND rides the first tendril — the sun is what powers it. */}
+        <a className="sun-tendril-tag" href="https://poundplay.com" target="_blank" rel="noreferrer" title="POUND — powered by the sun">
+          POUND
+        </a>
+      </div>
+      <h1 className="sun-title">Bank of Sol</h1>
+      <p className="sun-lede muted">Members only, by invitation. Leave your email and we'll reach out.</p>
+
+      <form className="sun-form" onSubmit={join} aria-live="polite">
+        <input
+          type="text"
+          name="website"
+          value={website}
+          onChange={(e) => setWebsite(e.target.value)}
+          tabIndex={-1}
+          autoComplete="off"
+          aria-hidden="true"
+          style={{ position: "absolute", left: -9999, width: 1, height: 1, opacity: 0 }}
+        />
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Name (optional)"
+          maxLength={120}
+          autoComplete="name"
+        />
+        <input
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@email.com"
+          maxLength={160}
+          autoComplete="email"
+        />
+        <button className="btn btn-gold" disabled={busy}>
+          {busy ? "Adding…" : "Add me to the waitlist"}
+        </button>
+        {result && <div className={`form-result ${result.ok ? "success" : "error"}`}>{result.text}</div>}
+      </form>
+
+      <div className="sun-login">
+        {data?.user ? (
+          <Link className="btn btn-ghost btn-sm" to="/dashboard">
+            Your account →
           </Link>
-          <Link className="btn btn-ghost btn-lg" to="/consulting">
-            What we do
+        ) : (
+          <Link className="btn btn-ghost btn-sm" to="/login">
+            Log in
           </Link>
-        </div>
-        <p className="lp-note">
-          Real availability, real calendar. Sessions confirm instantly and are
-          fully refundable up to 24 hours before.
-        </p>
-      </section>
-
-      <hr className="lp-rule" />
-
-      <section className="lp-section">
-        <div className="section-kicker">What we build</div>
-        <div className="service-rows">
-          {SERVICES.map((s) => (
-            <div className="service-row" key={s.n}>
-              <span className="service-index mono">{s.n}</span>
-              <div>
-                <h3>{s.title}</h3>
-                <p>{s.body}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="lp-band">
-        <div className="section-kicker">For people starting out in AI</div>
-        <h2>Thinking about consulting with AI yourself?</h2>
-        <p>
-          If you're early in this and want to build a real practice around it,
-          we work with a small number of people on exactly that: choosing a
-          niche, building an offer you can stand behind, setting up the tooling
-          and delivery process, and pricing the work honestly. No hype, no
-          guaranteed-income promises — just the skills and the setup, from
-          someone doing the work every day.
-        </p>
-        <p className="muted lp-band-note">
-          We're selective here on purpose, and we like working with people who
-          are serious about it. Bring your questions to a call and we'll tell
-          you straight whether we can help.
-        </p>
-        <Link className="btn btn-green" to="/book">
-          Talk it through
-        </Link>
-      </section>
-
-      <section className="lp-section">
-        <div className="section-kicker">How it works</div>
-        <div className="lp-steps">
-          {STEPS.map(([title, body], i) => (
-            <div className="lp-step" key={title}>
-              <span className="lp-step-n mono">{i + 1}</span>
-              <h3>{title}</h3>
-              <p>{body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="lp-close">
-        <h2>Bring the idea. We'll build the thing.</h2>
-        <p>
-          The fastest way to find out if this works is a conversation. Pick a
-          time that suits you.
-        </p>
-        <div className="lp-actions">
-          <Link className="btn btn-gold btn-lg" to="/book">
-            Start a call
-          </Link>
-          <Link className="btn btn-ghost btn-lg" to="/membership">
-            Become a member
-          </Link>
-        </div>
-      </section>
+        )}
+      </div>
     </div>
   );
 }

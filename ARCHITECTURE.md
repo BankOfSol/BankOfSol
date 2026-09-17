@@ -53,6 +53,7 @@ Account: `Kaasi.serrano@gmail.com's Account` (`568986ebd89d7e53c2666c4dd94b676b`
 | `BUCKET` | R2 | `bankofsol-uploads` | uploads via `/api/upload`, served via `/api/files/<key>` — never a public bucket URL |
 | `EMAIL` | service | `bankofsol-mailer` | in the mailer itself, `EMAIL` is the real `send_email` binding — same call shape (`env.EMAIL.send({...})`) both places |
 | `ASSETS` | assets | `./dist` | `run_worker_first: ["/api/*"]`, SPA fallback |
+| `AI` | Workers AI | — | CLOUD fallback for receipt scanning (`@cf/meta/llama-3.2-11b-vision-instruct`); the default scanner is Ray on Sol's Mac |
 
 Vars (wrangler.jsonc): `BETTER_AUTH_URL`, `ADMIN_EMAIL`, `APP_ORIGINS`, `MAIL_FROM`,
 `MAIL_FROM_NAME`, `SOLRAY_NOTIFY_EMAIL` (where Sol & Ray pilot requests are sent;
@@ -60,8 +61,11 @@ falls back to `ADMIN_EMAIL`).
 
 Vars (wrangler.jsonc): `BETTER_AUTH_URL`, `ADMIN_EMAIL` (= superadmin), `APP_ORIGINS`
 (comma-separated extra trusted origins), `MAIL_FROM`, `MAIL_FROM_NAME`.
+Var `RECEIPT_SCAN_MODE` = `ray` (default: Sol's Mac polls the queue, free) | `cloud`
+(Workers AI scans at upload time).
 Secrets (`wrangler secret put`): `BETTER_AUTH_SECRET`, `STRIPE_SECRET_KEY`,
-`STRIPE_WEBHOOK_SECRET`; Phase 2 `SLANT3D_API_KEY`; Phase 3 `SOLANA_RPC_URL` (+ vars
+`STRIPE_WEBHOOK_SECRET`, **`RAY_SHARED_TOKEN`** (16+ chars; = `RAY_BANK_TOKEN` in
+`AGENTS/Ray/.env` — Ray sends it as `X-Ray-Token`); Phase 2 `SLANT3D_API_KEY`; Phase 3 `SOLANA_RPC_URL` (+ vars
 `SOLANA_NETWORK`, `USDC_MINT`).
 
 **The mailer Worker** (`workers/mailer/`): owns `send_email` (allowed sender
@@ -103,6 +107,28 @@ ADMIN_EMAIL (paid orders / bookings / custody applications; silent when empty).
 - **0006 solray_lead**: Sol & Ray pilot requests from the landing page (name, title,
   org, email, phone, volume, message, source, ip for the per-IP cap; status
   new|contacted|pilot|closed; adminNote). No auth, no money — a plain lead queue.
+
+- **0007 reimbursements** (2026-09-17): `payout_profile` (one per member — how they
+  want to be paid back: stripe | crypto {chain, PUBLIC address, tag} | telegram
+  {handle, TON address} | cash; Stripe stores only the Connect Express `acct_` id),
+  `reimbursement` (`RMB-XXXXXX`, submitted → approved → paid | rejected; `payoutJson`
+  snapshots the payout details at submit time), `receipt` (one photo each in R2;
+  scan lifecycle queued → scanning (leased, 10-min lease) → scanned | failed;
+  `scanJson` = the model's structured read, `merchant/purchaseDate/totalCents` start
+  from the scan and stay member-editable — the human is the source of truth).
+  **`ledger_entry` rebuilt** to add kinds `reimbursement` (negative: approval, Sol
+  owes the member) and `payout` (positive: Sol paid it out).
+- **0009 hub** (2026-09-17): Sol's command center — `ecosystem` (the income streams:
+  slug, status seed|building|live|paused|closed, color, url, monthlyTargetCents; seeded
+  with POUND, Bank of Sol, Sol & Ray, Kennel Club, Shop), `income_entry` (signed cents
+  per ecosystem, negative = expense), `goal` (money target or %, owner sol|ray|both,
+  Ray's `rayNote`), `ray_note` (briefing|advice|alert|win from Ray; read/dismissed).
+- **0010 hub sources** (2026-09-17): `income_entry.externalId` + UNIQUE(source, externalId)
+  (imports from Ray never double count); `hub_metric` (latest value per source/key — the
+  "live signals": Stripe balance, POUND counts, chain balances, Cloudflare traffic);
+  `payment_claim.chainCheckJson/chainCheckedAt` (what the explorer said about a claim).
+- **0008 waitlist**: `waitlist` (email UNIQUE, name, note, ip, status
+  new|invited|closed). The public site's only write.
 
 Money is integer cents everywhere; `parseFloat` is banned in money files. Slots are
 computed on request, never materialized; the atomic primitive is the guarded
@@ -153,6 +179,27 @@ middleware. Admin mutations all `logAdminActivity`.
 | POST `/api/solray/pilot-request` | public+caps | Sol & Ray lead capture: honeypot (`website`), 5/IP/day, length-capped fields → `solray_lead` + two emails (requester confirmation; notice to `SOLRAY_NOTIFY_EMAIL`) |
 | GET/POST `/api/admin/solray/leads` | admin | lead queue (?status=); status/adminNote updates (logAdminActivity) |
 | `/api/superadmin/{admins,activity}` | superadmin | grant/revoke isAdmin (isSuperAdmin NEVER grantable); audit feed |
+| POST `/api/waitlist` | public+caps | honeypot, 5/IP/day, UNIQUE email → `waitlist` + confirmation + admin notice |
+| GET/POST `/api/admin/waitlist` | admin | list (?status=) / status + adminNote |
+| GET `/api/reimbursements` | member | payout profile + loose receipts + requests (with receipts) |
+| POST `/api/reimbursements` | member | bundle loose receipts (all with confirmed totals) into a request; total = SUM; payout snapshot from profile; emails Sol |
+| POST/PATCH/DELETE `/api/reimbursements/receipts` | member | upload photo → R2 + `receipt` row (status queued; cloud mode scans inline) / edit merchant·date·total·note / delete a loose receipt |
+| POST `/api/reimbursements/rescan` | member | {id, where:'ray'|'cloud'} — re-queue for Ray, or run Workers AI now |
+| GET/POST `/api/reimbursements/profile` | member | payout profile; `action:'stripe_onboard'` (Connect Express account + onboarding link), `action:'stripe_refresh'` (payouts_enabled check) |
+| GET/POST `/api/ray/receipts` | `X-Ray-Token` | Ray's scan queue: GET leases queued receipts (+ the prompt), POST {id, model, output|error} writes the scan |
+| GET `/api/superadmin/hub` | superadmin | the command center: ecosystems (+ month/30d/lifetime income), totals, goals, Ray's notes, recent income, bank stats |
+| POST/DELETE `/api/superadmin/hub/ecosystems` | superadmin | ecosystem upsert (slug UNIQUE) / delete (409 while it has income) |
+| POST/DELETE `/api/superadmin/hub/income` | superadmin | signed income entry add / delete |
+| POST/DELETE `/api/superadmin/hub/goals` | superadmin | goal upsert (money target or %) / delete |
+| POST `/api/superadmin/hub/notes` | superadmin | Ray's notes: read / dismiss / read_all |
+| GET/POST `/api/ray/hub` | `X-Ray-Token` | Ray reads the summary; posts notes (briefing/advice/alert/win) + per-goal rayNote/progressPct + **imports**: `income[]` (idempotent on source+externalId) and `metrics[]` (latest per source+key). Ray can never touch statuses or the member ledger |
+| GET/POST `/api/ray/claims` | `X-Ray-Token` | pending crypto claims (with the rail address/tag) + active rails → Ray checks each tx on the public explorer and posts `checks[]` → `payment_claim.chainCheckJson` (advisory; Sol still confirms) |
+| GET/POST `/api/admin/reimbursements` | admin | queue (?status=); approve (books −total) / reject / paid {paidMethod, paidRef} (books +total) / stripe_transfer (Connect Transfer, then books +total) |
+
+**Orphaned server routes** (2026-09-17): the shop, booking, and Sol & Ray routes
+above still compile and answer, but nothing in the SPA links to them any more —
+the public site is the waitlist. Delete them (and the mailer's booking cron) when
+Sol confirms they're dead.
 
 ## 5 · Auth & roles
 
@@ -163,6 +210,13 @@ self-healed into the DB at session time. Cross-subdomain cookies (`.bankofsol.ap
 enabled only in prod (an explicit domain would break localhost). Owner-scoped routes
 return 404, not 403. The shop checkout/confirm are deliberately public (guest
 checkout) — do NOT "fix" them with requireUser.
+
+**The public site** (2026-09-17) is `/` only: the animated sun (`public/sun.webp`,
+640px, generated from Sol's still by `scratchpad/sun_anim.py` — the 1024px GIF master
+is delivered separately), a waitlist form, and a low-key "Log in" button. A second,
+quieter way in is the dim ☼ beside the footer copyright. There is no public
+navigation. `/signup` still exists but nothing links to it — Sol sends invited people
+there by hand. shop.bankofsol.app now redirects to the apex.
 
 ## 6 · Email
 
@@ -210,6 +264,50 @@ Solana Pay merchant checkout (raw JSON-RPC, no SDK). Full plan:
 `/Users/sol/.claude/plans/how-does-a-bank-imperative-sunbeam.md`.
 
 ## Changelog
+
+- **2026-09-17 (evening)** — **The hub listens: Stripe, poundplay stats, chain explorers,
+  Cloudflare Analytics.** All pulled by Ray (`AGENTS/Ray/ray/hubsync.py`, hourly, outbound
+  only) and posted through `/api/ray/hub` (income idempotent on source+externalId; metrics
+  latest per source+key) and the new `/api/ray/claims` (on-chain checks of pending crypto
+  claims: amount, USD via CoinGecko, "→ our address", confirmed — shown under the tx in
+  Admin → Members, advisory only). poundplay.com gained `GET /api/ray/stats` (counts only,
+  recorded in ITS ARCHITECTURE.md). Overview shows "Live signals" grouped by source;
+  ecosystem cards show their own; imported income rows are locked (🔒) instead of
+  deletable. Migration 0010. Cloudflare Analytics needs `CF_ANALYTICS_TOKEN` in Ray's
+  .env (not created yet — that source stays skipped until Sol makes the token).
+- **2026-09-17 (later)** — **Command center + solar theme.** `/superadmin` is now Sol's
+  hub (`SuperAdmin.jsx`): HUD stats (month/30d income, owed/owes, members, scanner
+  queue), a LEVEL/XP card (level from lifetime income, 250·L² dollars), the **solar
+  map** (`SolarMap.jsx`: the sun with one animated tendril per ecosystem, POUND on the
+  first), Ecosystems (edit + income log with XP bars vs monthly target), shared Goals
+  (Sol/Ray/both, money or %), Ray's notes feed, and Ops (the old admins/activity/rails,
+  now `SuperAdminOps.jsx`). Ray's side: `AGENTS/Ray/ray/hub.py` runs one pass a day
+  after 8am (reads `/api/ray/hub`, asks the local model for a briefing + ≤3 notes + a
+  note per active goal, posts back). Theme retuned to deep-space + solar gold/ember,
+  new tokens `--ember`, `--cyan` (Ray), `--violet`, `--glow`; HUD corner brackets, XP
+  shimmer, tendril flow, all off under prefers-reduced-motion. Homepage sun carries a
+  POUND tag on its tendril (links to poundplay.com). Migration 0009. Verified locally
+  (seeded income/goals; Ray pass end-to-end). Not deployed.
+- **2026-09-17** — **Stripped to sun + waitlist + login; receipts & reimbursements.**
+  Public site is now just the homepage (animated sun, waitlist, login) + auth/legal
+  pages; consulting/booking/shop/membership-marketing/Sol & Ray pages and their admin
+  tabs removed from the SPA (server routes orphaned, see §4). Nav shows nothing to
+  visitors. New behind-login **reimbursement desk** (`/reimbursements`): members
+  photograph receipts → R2 + `receipt` row → **Ray** (AGENTS/Ray `ray/receipts.py`,
+  local `qwen3-vl:8b` through Ollama) polls `/api/ray/receipts` with the shared token,
+  reads the photo, posts structured JSON back; Workers AI is the cloud fallback
+  (`RECEIPT_SCAN_MODE=cloud` or a member's "try cloud"). Member confirms merchant/
+  date/total, bundles receipts into an `RMB-` request, picks payout: Stripe Connect
+  Express (onboarding link; admin pays with a Transfer), crypto (member's public
+  address), Telegram Wallet (handle + TON address), or cash. Admin → Reimbursements:
+  approve (ledger −total) / reject / mark paid with reference (ledger +total) /
+  Stripe transfer. Cash needs the same manual approve + mark-paid as every rail.
+  Migrations 0007 (incl. `ledger_entry` rebuild for the two new kinds) + 0008.
+  New binding `AI`, var `RECEIPT_SCAN_MODE`, secret `RAY_SHARED_TOKEN`. Emails:
+  reimbursement submitted/decision/paid, waitlist received. Verified locally
+  (waitlist 201; receipt upload → Ray scan → request → approve → paid; 375px).
+  **Not deployed**: needs `db:migrate` (0007+0008), `wrangler secret put
+  RAY_SHARED_TOKEN`, `RAY_BANK_TOKEN` in Ray's .env + Ray restart, then `deploy`.
 
 - **2026-09-04** — **Sol & Ray: review pass, savings estimator, privacy notice, Searchlight
   page.** Fixes from review: anchors no longer hide under the sticky header

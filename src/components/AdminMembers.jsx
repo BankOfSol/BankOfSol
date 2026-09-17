@@ -15,9 +15,40 @@ const KIND_LABELS = {
   loan_payment: "Loan payment",
   adjustment: "Adjustment",
   refund: "Refund",
+  reimbursement: "Reimbursement approved",
+  payout: "Payout sent",
 };
 
 const METHODS = ["stripe", "XRP", "SOL", "BTC", "TON", "other"];
+
+// What Ray found on-chain for a claim (functions/api/ray/claims.js). Advisory
+// only: Sol still types the USD value and clicks Confirm.
+function ChainCheck({ raw }) {
+  if (!raw) return null;
+  let c;
+  try {
+    c = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  const when = c.checkedAt ? new Date(c.checkedAt).toLocaleString() : "";
+  if (!c.ok) {
+    return (
+      <div className="muted" style={{ fontSize: "0.78rem", marginTop: 4 }} title={when}>
+        ⛓ not found on-chain yet{c.error ? ` · ${c.error}` : ""}
+      </div>
+    );
+  }
+  const good = c.matchesRail === true && c.confirmed !== false;
+  return (
+    <div className={good ? "green" : "red"} style={{ fontSize: "0.78rem", marginTop: 4 }} title={when}>
+      ⛓ {c.amount} {c.symbol}
+      {c.usd != null ? ` ≈ $${c.usd.toFixed(2)}` : ""}
+      {c.matchesRail === true ? " → our address" : c.matchesRail === false ? " → NOT our address" : ""}
+      {c.confirmed === false ? " · unconfirmed" : ""}
+    </div>
+  );
+}
 
 function BalanceChip({ cents, big = false }) {
   const style = big ? { fontSize: "1rem", padding: "6px 14px" } : undefined;
@@ -917,6 +948,7 @@ function MemberDetail({ userId, onBack, onChanged }) {
                             <span className="muted" style={{ fontSize: "0.8rem" }}>{c.note}</span>
                           </>
                         )}
+                        <ChainCheck raw={c.chainCheckJson} />
                       </td>
                       <td className="muted" style={{ whiteSpace: "nowrap" }}>
                         {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "—"}

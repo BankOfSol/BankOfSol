@@ -14,7 +14,7 @@ export async function onRequestGet({ request, env }) {
       .catch(() => 0);
 
   const nowIso = new Date().toISOString();
-  const [membershipApplied, upcomingBookings, paidOrders, pendingClaims, openInvoices, solrayLeads] =
+  const [membershipApplied, upcomingBookings, paidOrders, pendingClaims, openInvoices, solrayLeads, pendingReimbursements, approvedReimbursements, waitlistNew] =
     await Promise.all([
       count(`SELECT COUNT(*) AS n FROM "member_account" WHERE "status" = 'applied'`),
       count(
@@ -25,7 +25,13 @@ export async function onRequestGet({ request, env }) {
       count(`SELECT COUNT(*) AS n FROM "payment_claim" WHERE "status" = 'pending'`),
       count(`SELECT COUNT(*) AS n FROM "invoice" WHERE "status" IN ('open','partial')`),
       count(`SELECT COUNT(*) AS n FROM "solray_lead" WHERE "status" = 'new'`),
+      count(`SELECT COUNT(*) AS n FROM "reimbursement" WHERE "status" = 'submitted'`),
+      count(`SELECT COUNT(*) AS n FROM "reimbursement" WHERE "status" = 'approved'`),
+      count(`SELECT COUNT(*) AS n FROM "waitlist" WHERE "status" = 'new'`),
     ]);
 
-  return json({ membershipApplied, upcomingBookings, paidOrders, pendingClaims, openInvoices, solrayLeads });
+  return json({
+    membershipApplied, upcomingBookings, paidOrders, pendingClaims, openInvoices, solrayLeads,
+    pendingReimbursements, approvedReimbursements, waitlistNew,
+  });
 }

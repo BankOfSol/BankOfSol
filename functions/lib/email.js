@@ -451,3 +451,67 @@ export function sendSolrayLeadNotice(env, lead) {
     cta: { label: "Open the lead queue", url: "https://bankofsol.app/admin" },
   }, { kind: "solray-lead-notice" });
 }
+
+// ── Reimbursements ──────────────────────────────────────────────────────────
+// Receipts → request → approve → payout. Sol gets the submission notice;
+// the member gets the decision and the payout confirmation.
+
+const PAYOUT_LABEL = { stripe: "Stripe (card/bank)", crypto: "crypto", telegram: "Telegram Wallet", cash: "cash" };
+
+export function sendReimbursementSubmitted(env, reimb, member, receiptCount) {
+  const site = env.SITE_URL || env.BETTER_AUTH_URL || "https://bankofsol.app";
+  const lines = [
+    `${member.name || member.email} filed ${reimb.refCode}: ${reimb.title}`,
+    `Total: ${usd(reimb.totalCents)} across ${receiptCount} receipt${receiptCount === 1 ? "" : "s"}`,
+    `Payout: ${PAYOUT_LABEL[reimb.method] || reimb.method}`,
+    reimb.note ? `Note: ${reimb.note}` : "",
+  ].filter(Boolean);
+  return send(env, env.ADMIN_EMAIL, {
+    subject: `Reimbursement request ${reimb.refCode} — ${usd(reimb.totalCents)}`,
+    heading: "A reimbursement needs your approval.",
+    bodyHtml: `<p>${lines.map(escapeHtml).join("<br>")}</p><p>Approve, reject, or pay it from Admin → Reimbursements.</p>`,
+    bodyText: `${lines.join("\n")}\nApprove, reject, or pay it from Admin → Reimbursements.`,
+    cta: { label: "Review the request", url: `${site}/admin` },
+  }, { kind: "reimbursement-submitted", note: reimb.refCode });
+}
+
+export function sendReimbursementDecision(env, member, reimb, status) {
+  const site = env.SITE_URL || env.BETTER_AUTH_URL || "https://bankofsol.app";
+  const approved = status === "approved";
+  return send(env, member.email, {
+    subject: approved
+      ? `Approved: ${reimb.refCode} — ${usd(reimb.totalCents)}`
+      : `About ${reimb.refCode} — Bank of Sol`,
+    heading: approved ? "Approved — payout is next." : "About your reimbursement request",
+    bodyHtml: approved
+      ? `<p><strong>${escapeHtml(reimb.title)}</strong> (${escapeHtml(reimb.refCode)}) is approved for <strong>${usd(reimb.totalCents)}</strong>. It's on your ledger now and will be paid out by ${escapeHtml(PAYOUT_LABEL[reimb.method] || reimb.method)}; you'll get another email when it's sent.</p>${reimb.adminNote ? `<p style="color:${DIM};">Note from Sol: ${escapeHtml(reimb.adminNote)}</p>` : ""}`
+      : `<p><strong>${escapeHtml(reimb.title)}</strong> (${escapeHtml(reimb.refCode)}) wasn't approved.</p>${reimb.adminNote ? `<p>Note from Sol: ${escapeHtml(reimb.adminNote)}</p>` : ""}<p>Reply to this email if you'd like to talk it through.</p>`,
+    bodyText: approved
+      ? `${reimb.title} (${reimb.refCode}) is approved for ${usd(reimb.totalCents)}. It's on your ledger and will be paid out by ${PAYOUT_LABEL[reimb.method] || reimb.method}.${reimb.adminNote ? `\nNote from Sol: ${reimb.adminNote}` : ""}`
+      : `${reimb.title} (${reimb.refCode}) wasn't approved.${reimb.adminNote ? `\nNote from Sol: ${reimb.adminNote}` : ""}\nReply to this email if you'd like to talk it through.`,
+    ...(approved ? { accent: GREEN, cta: { label: "See your account", url: `${site}/reimbursements` } } : {}),
+  }, { kind: "reimbursement-decision", note: `${reimb.refCode} ${status}` });
+}
+
+export function sendReimbursementPaid(env, member, reimb) {
+  const site = env.SITE_URL || env.BETTER_AUTH_URL || "https://bankofsol.app";
+  const how = PAYOUT_LABEL[reimb.paidMethod] || reimb.paidMethod || "";
+  return send(env, member.email, {
+    subject: `Paid: ${reimb.refCode} — ${usd(reimb.totalCents)}`,
+    heading: "Sent. Thank you.",
+    bodyHtml: `<p><strong>${usd(reimb.totalCents)}</strong> for <strong>${escapeHtml(reimb.title)}</strong> (${escapeHtml(reimb.refCode)}) was paid out by ${escapeHtml(how)}.</p>${reimb.paidRef ? `<p style="color:${DIM};word-break:break-all;">Reference: ${escapeHtml(reimb.paidRef)}</p>` : ""}`,
+    bodyText: `${usd(reimb.totalCents)} for ${reimb.title} (${reimb.refCode}) was paid out by ${how}.${reimb.paidRef ? `\nReference: ${reimb.paidRef}` : ""}`,
+    accent: GREEN,
+    cta: { label: "See your ledger", url: `${site}/billing` },
+  }, { kind: "reimbursement-paid", note: reimb.refCode });
+}
+
+// ── Waitlist ────────────────────────────────────────────────────────────────
+
+export const sendWaitlistReceived = (env, person) =>
+  send(env, person.email, {
+    subject: "You're on the Bank of Sol waitlist",
+    heading: `Thanks, ${escapeHtml(firstName(person))}.`,
+    bodyHtml: `<p>You're on the list. Bank of Sol is members-only and by invitation; Sol reviews the waitlist personally and will reach out at this address.</p>`,
+    bodyText: "You're on the list. Bank of Sol is members-only and by invitation; Sol reviews the waitlist personally and will reach out at this address.",
+  }, { kind: "waitlist-received" });

@@ -61,6 +61,11 @@
   // the console instead — that's the intended local default.
   "services": [{ "binding": "EMAIL", "service": "bankofsol-mailer" }],
 
+  // Workers AI — the CLOUD fallback for receipt scanning (RECEIPT_SCAN_MODE=cloud,
+  // or a member's "rescan in the cloud"). The default path is Ray's local Qwen
+  // vision model polling /api/ray/receipts with the RAY_SHARED_TOKEN secret.
+  "ai": { "binding": "AI" },
+
   // Non-secret vars. Secrets are set with `npx wrangler secret put <NAME>`
   // (do NOT commit them here): BETTER_AUTH_SECRET, STRIPE_SECRET_KEY,
   // STRIPE_WEBHOOK_SECRET; later SLANT3D_API_KEY, SOLANA_RPC_URL.
@@ -71,6 +76,10 @@
     "MAIL_FROM": "sol@bankofsol.app",
     "MAIL_FROM_NAME": "Bank of Sol",
     // Where Sol & Ray pilot requests are sent (falls back to ADMIN_EMAIL).
-    "SOLRAY_NOTIFY_EMAIL": "Kaasi.serrano@gmail.com"
+    "SOLRAY_NOTIFY_EMAIL": "Kaasi.serrano@gmail.com",
+    // Receipt scanning: "ray" (Sol's Mac polls the queue; free) or "cloud"
+    // (Workers AI scans at upload time). Secret RAY_SHARED_TOKEN pairs with
+    // RAY_BANK_TOKEN in AGENTS/Ray/.env.
+    "RECEIPT_SCAN_MODE": "ray"
   }
 }

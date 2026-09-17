@@ -17,6 +17,8 @@ const KIND_LABELS = {
   loan_payment: "Loan payment",
   adjustment: "Adjustment",
   refund: "Refund",
+  reimbursement: "Reimbursement approved",
+  payout: "Paid out to you",
 };
 
 function BalanceChip({ cents }) {

@@ -2,12 +2,10 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMe } from "../lib/me-context.jsx";
 import { api } from "../lib/api.js";
-import { shopSiteUrl } from "../lib/host.js";
 import AdminMembers from "../components/AdminMembers.jsx";
 import MembershipQueueAdmin from "../components/MembershipQueueAdmin.jsx";
-import BookingAdmin from "../components/BookingAdmin.jsx";
-import AvailabilityEditor from "../components/AvailabilityEditor.jsx";
-import SolrayLeadsAdmin from "../components/SolrayLeadsAdmin.jsx";
+import ReimbursementsAdmin from "../components/ReimbursementsAdmin.jsx";
+import WaitlistAdmin from "../components/WaitlistAdmin.jsx";
 import usePageMeta from "../lib/usePageMeta.js";
 
 function EmailLog() {
@@ -56,19 +54,17 @@ function EmailLog() {
 }
 
 const TABS = [
+  { key: "reimbursements", label: "🧾 Reimbursements" },
   { key: "members", label: "👥 Members" },
   { key: "applications", label: "📨 Applications" },
-  { key: "bookings", label: "📅 Bookings" },
-  { key: "availability", label: "🗓 Availability" },
-  { key: "shop", label: "🛒 Shop" },
-  { key: "leads", label: "☎️ Sol & Ray leads" },
+  { key: "waitlist", label: "☀️ Waitlist" },
   { key: "email", label: "✉️ Email log" },
 ];
 
 export default function Admin() {
   usePageMeta({ title: "Admin" });
   const { me } = useMe();
-  const [tab, setTab] = useState("members");
+  const [tab, setTab] = useState("reimbursements");
   const [counts, setCounts] = useState({});
 
   const loadCounts = () => {
@@ -89,11 +85,10 @@ export default function Admin() {
   }
 
   const badge = {
+    reimbursements: (counts.pendingReimbursements || 0) + (counts.approvedReimbursements || 0),
     members: counts.pendingClaims,
     applications: counts.membershipApplied,
-    bookings: counts.upcomingBookings,
-    shop: counts.paidOrders,
-    leads: counts.solrayLeads,
+    waitlist: counts.waitlistNew,
   };
 
   return (
@@ -120,24 +115,10 @@ export default function Admin() {
         ))}
       </div>
 
+      {tab === "reimbursements" && <ReimbursementsAdmin onChanged={loadCounts} />}
       {tab === "members" && <AdminMembers onChanged={loadCounts} />}
       {tab === "applications" && <MembershipQueueAdmin onChanged={loadCounts} />}
-      {tab === "bookings" && <BookingAdmin onChanged={loadCounts} />}
-      {tab === "availability" && <AvailabilityEditor />}
-      {tab === "shop" && (
-        <div className="panel">
-          <h3>The shop manages itself in place</h3>
-          <p className="muted">
-            The storefront is its own site at shop.bankofsol.app — products,
-            orders, and the shop profile are managed right on it with the
-            manage view switched on. Your admin session carries over.
-          </p>
-          <a className="btn btn-gold" href={shopSiteUrl("/?view=manage")}>
-            Open shop manager →
-          </a>
-        </div>
-      )}
-      {tab === "leads" && <SolrayLeadsAdmin onChanged={loadCounts} />}
+      {tab === "waitlist" && <WaitlistAdmin onChanged={loadCounts} />}
       {tab === "email" && <EmailLog />}
     </div>
   );

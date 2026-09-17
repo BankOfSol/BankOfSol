@@ -38,3 +38,10 @@ SOLANA_RPC_URL=""
 SOLANA_NETWORK="devnet"
 # Devnet USDC mint below; mainnet is EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
 USDC_MINT="4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
+
+# ── Reimbursements ───────────────────────────────────────────────────────────
+# Shared secret Ray (AGENTS/Ray) sends as X-Ray-Token when it polls the receipt
+# scan queue. Set the same value as RAY_BANK_TOKEN in Ray's .env. 16+ chars.
+RAY_SHARED_TOKEN=""
+# "ray" = Sol's Mac scans receipts (default, free); "cloud" = Workers AI at upload.
+RECEIPT_SCAN_MODE="ray"

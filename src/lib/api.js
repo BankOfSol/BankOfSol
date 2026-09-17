@@ -102,6 +102,41 @@ export const api = {
   claimInvoice: (id, payload) => post(`/api/billing/invoices/${id}/claim`, payload),
   billingConfirm: (sessionId) => post("/api/billing/confirm", { sessionId }),
 
+  // ── Waitlist (the one public write) ───────────────────────────────────────
+  joinWaitlist: (payload) =>
+    post("/api/waitlist", { ...payload, source: window.location.host + window.location.pathname }),
+  adminWaitlist: (status = "new") => req(`/api/admin/waitlist?status=${status}`),
+  adminWaitlistAction: (payload) => post("/api/admin/waitlist", payload),
+
+  // ── Reimbursements (member) ───────────────────────────────────────────────
+  reimbursements: () => req("/api/reimbursements"),
+  uploadReceipt: (file) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return req("/api/reimbursements/receipts", { method: "POST", body: fd });
+  },
+  updateReceipt: (payload) =>
+    req("/api/reimbursements/receipts", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  deleteReceipt: (id) => req(`/api/reimbursements/receipts?id=${id}`, { method: "DELETE" }),
+  rescanReceipt: (id, where) => post("/api/reimbursements/rescan", { id, where }),
+  submitReimbursement: (payload) => post("/api/reimbursements", payload),
+  payoutProfile: () => req("/api/reimbursements/profile"),
+  savePayoutProfile: (payload) => post("/api/reimbursements/profile", payload),
+  stripePayoutOnboard: () =>
+    post("/api/reimbursements/profile", {
+      action: "stripe_onboard",
+      returnUrl: window.location.origin + "/reimbursements",
+    }),
+  stripePayoutRefresh: () => post("/api/reimbursements/profile", { action: "stripe_refresh" }),
+
+  // ── Reimbursements (admin) ────────────────────────────────────────────────
+  adminReimbursements: (status = "submitted") => req(`/api/admin/reimbursements?status=${status}`),
+  adminReimbursementAction: (payload) => post("/api/admin/reimbursements", payload),
+
   // ── Reviews ───────────────────────────────────────────────────────────────
   postReview: (payload) => post("/api/reviews", payload),
   myReviews: () => req("/api/reviews"),
@@ -138,6 +173,16 @@ export const api = {
   adminCounts: () => req("/api/admin/counts"),
   emailLog: (params = {}) =>
     req(`/api/admin/email-log?${new URLSearchParams(params)}`),
+
+  // ── Sol's command center (super admin) ────────────────────────────────────
+  hub: () => req("/api/superadmin/hub"),
+  hubSaveEcosystem: (payload) => post("/api/superadmin/hub/ecosystems", payload),
+  hubDeleteEcosystem: (id) => req(`/api/superadmin/hub/ecosystems?id=${id}`, { method: "DELETE" }),
+  hubAddIncome: (payload) => post("/api/superadmin/hub/income", payload),
+  hubDeleteIncome: (id) => req(`/api/superadmin/hub/income?id=${id}`, { method: "DELETE" }),
+  hubSaveGoal: (payload) => post("/api/superadmin/hub/goals", payload),
+  hubDeleteGoal: (id) => req(`/api/superadmin/hub/goals?id=${id}`, { method: "DELETE" }),
+  hubNoteAction: (payload) => post("/api/superadmin/hub/notes", payload),
 
   // ── Super admin (Sol only) ────────────────────────────────────────────────
   superAdmins: (search) =>

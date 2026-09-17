@@ -1,15 +1,15 @@
 import { isShopHost, mainSiteUrl } from "../lib/host.js";
 import { Link } from "react-router-dom";
 
-function FootLink({ to, children }) {
+function FootLink({ to, children, className = "foot-link" }) {
   if (isShopHost())
     return (
-      <a className="foot-link" href={mainSiteUrl(to)}>
+      <a className={className} href={mainSiteUrl(to)}>
         {children}
       </a>
     );
   return (
-    <Link className="foot-link" to={to}>
+    <Link className={className} to={to}>
       {children}
     </Link>
   );
@@ -31,7 +31,14 @@ export default function Footer() {
           bank or licensed depository institution. Member accounts are service
           ledgers, not deposit accounts, and are not FDIC insured.
         </p>
-        <p className="footer-copy">© {new Date().getFullYear()} Bank of Sol</p>
+        <p className="footer-copy">
+          © {new Date().getFullYear()} Bank of Sol{" "}
+          <FootLink to="/login">
+            <span className="footer-sun" aria-label="Member login" title="Member login">
+              ☼
+            </span>
+          </FootLink>
+        </p>
       </div>
     </footer>
   );

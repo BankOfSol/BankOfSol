@@ -1,45 +1,491 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMe } from "../lib/me-context.jsx";
 import { api } from "../lib/api.js";
+import { fmtUsd, centsToUsd } from "../lib/money.js";
 import usePageMeta from "../lib/usePageMeta.js";
+import SolarMap from "../components/SolarMap.jsx";
+import SuperAdminOps from "../components/SuperAdminOps.jsx";
 
-// Sol only: grant/revoke admin, watch the audit feed. isSuperAdmin is never
-// grantable from anywhere — it belongs to ADMIN_EMAIL, self-healed at login.
-export default function SuperAdmin() {
-  usePageMeta({ title: "Super Admin" });
-  const { me } = useMe();
-  const [tab, setTab] = useState("admins");
-  const [data, setData] = useState(null);
-  const [search, setSearch] = useState("");
-  const [activity, setActivity] = useState(null);
-  const [rails, setRails] = useState(null);
-  const [err, setErr] = useState("");
+// Sol's command center. The sun in the middle, the ecosystems (income
+// streams) on its tendrils, the money each one brings in, the goals Sol and
+// Ray share, and Ray's notes back. Game-flavored on purpose: HUD panels,
+// XP bars, a level — Sol's safe haven.
 
-  const load = (q = "") => {
-    api
-      .superAdmins(q)
-      .then(setData)
-      .catch((e) => setErr(e.message));
-  };
-  useEffect(() => load(), []);
-  useEffect(() => {
-    if (tab === "activity" && activity === null) {
-      api.adminActivity().then((d) => setActivity(d.activity || [])).catch(() => setActivity([]));
-    }
-    if (tab === "rails" && rails === null) {
-      api.rails().then((d) => setRails(d.rails || [])).catch((e) => setErr(e.message));
-    }
-  }, [tab, activity, rails]);
+const ECO_STATUSES = ["seed", "building", "live", "paused", "closed"];
+const STATUS_BADGE = {
+  seed: "badge",
+  building: "badge badge-gold",
+  live: "badge badge-green",
+  paused: "badge",
+  closed: "badge badge-red",
+};
+const NOTE_ICON = { briefing: "☀️", advice: "💡", alert: "⚠️", win: "🏆" };
 
-  async function setFlag(userId, isAdmin) {
+// Level = f(lifetime income). Each level needs more than the last:
+// threshold(L) = 250 · L² dollars. Level 1 at $0, 2 at $1,000, 3 at $2,250 …
+function levelFor(lifetimeCents) {
+  const dollars = Math.max(0, lifetimeCents) / 100;
+  let L = 1;
+  while (dollars >= 250 * (L + 1) * (L + 1)) L++;
+  const cur = 250 * L * L;
+  const next = 250 * (L + 1) * (L + 1);
+  return { level: L, pct: Math.min(100, Math.round(((dollars - cur) / (next - cur)) * 100)), next };
+}
+
+function Stat({ label, value, tone, sub }) {
+  return (
+    <div className={`hud-stat${tone ? ` ${tone}` : ""}`}>
+      <div className="hud-stat-label">{label}</div>
+      <div className="hud-stat-value">{value}</div>
+      {sub && <div className="hud-stat-sub">{sub}</div>}
+    </div>
+  );
+}
+
+const fmtMetric = (m) => {
+  if (m.unit === "usd") return fmtUsd(Math.round(m.value * 100));
+  if (m.unit === "days") return `${m.value} d`;
+  if (m.unit && m.unit !== "count") return `${Number(m.value).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${m.unit}`;
+  return Number(m.value).toLocaleString();
+};
+const SOURCE_LABEL = { stripe: "Stripe", pound: "poundplay.com", chain: "On-chain", cloudflare: "Cloudflare" };
+
+// Live signals: what Ray pulled from outside (hubsync). Grouped by source.
+function Signals({ metrics, compact = false }) {
+  if (!metrics?.length) {
+    return compact ? null : (
+      <div className="empty">No live signals yet. Ray's hourly sync fills this once the token is set.</div>
+    );
+  }
+  const bySource = {};
+  for (const m of metrics) (bySource[m.source] = bySource[m.source] || []).push(m);
+  const stale = (m) => Date.now() - Date.parse(m.updatedAt) > 3 * 60 * 60 * 1000;
+  return (
+    <div className="signals">
+      {Object.entries(bySource).map(([src, list]) => (
+        <div key={src} className="signal-group">
+          <div className="hud-sub" style={{ margin: "0 0 6px" }}>
+            {SOURCE_LABEL[src] || src}
+            <span className="muted" style={{ textTransform: "none", letterSpacing: 0, marginLeft: 8 }}>
+              {stale(list[0]) ? "· stale" : `· ${new Date(list[0].updatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}
+            </span>
+          </div>
+          <div className="signal-row">
+            {list.map((m) => (
+              <div key={m.key} className="signal" title={m.detail ? JSON.stringify(m.detail) : m.key}>
+                <span className="signal-value mono">{fmtMetric(m)}</span>
+                <span className="signal-label">{m.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function XpBar({ pct, color, label }) {
+  return (
+    <div className="xp" title={label}>
+      <div className="xp-fill" style={{ width: `${Math.min(100, Math.max(0, pct))}%`, background: color }} />
+    </div>
+  );
+}
+
+// ── Ecosystems ──────────────────────────────────────────────────────────────
+
+const emptyEco = { id: null, name: "", slug: "", tagline: "", status: "building", color: "#ff6b1a", url: "", monthlyTarget: "", notes: "", sortOrder: 0 };
+
+function EcosystemPanel({ hub, selected, onSelect, reload, setErr }) {
+  const [form, setForm] = useState(null);
+  const [income, setIncome] = useState({ amount: "", occurredOn: new Date().toISOString().slice(0, 10), source: "", note: "" });
+  const [busy, setBusy] = useState(false);
+  const eco = hub.ecosystems.find((e) => e.id === selected) || null;
+  const entries = hub.income.filter((i) => !eco || i.ecosystemId === eco.id);
+
+  const edit = (e) =>
+    setForm(
+      e
+        ? { id: e.id, name: e.name, slug: e.slug, tagline: e.tagline || "", status: e.status, color: e.color, url: e.url || "", monthlyTarget: e.monthlyTargetCents ? centsToUsd(e.monthlyTargetCents) : "", notes: e.notes || "", sortOrder: e.sortOrder }
+        : { ...emptyEco, sortOrder: hub.ecosystems.length }
+    );
+
+  async function save(e) {
+    e.preventDefault();
     setErr("");
+    setBusy(true);
     try {
-      await api.setAdminFlags(userId, { isAdmin });
-      load(search);
+      const r = await api.hubSaveEcosystem(form);
+      setForm(null);
+      await reload();
+      onSelect(r.id);
+    } catch (e2) {
+      setErr(e2.message);
+    }
+    setBusy(false);
+  }
+
+  async function addIncome(e) {
+    e.preventDefault();
+    if (!eco) return;
+    setErr("");
+    setBusy(true);
+    try {
+      await api.hubAddIncome({ ecosystemId: eco.id, ...income });
+      setIncome((p) => ({ ...p, amount: "", note: "" }));
+      await reload();
+    } catch (e2) {
+      setErr(e2.message);
+    }
+    setBusy(false);
+  }
+
+  async function del(e) {
+    if (!window.confirm(`Delete ${e.name}?`)) return;
+    try {
+      await api.hubDeleteEcosystem(e.id);
+      onSelect(null);
+      await reload();
+    } catch (e2) {
+      setErr(e2.message);
+    }
+  }
+
+  return (
+    <div className="hub-grid">
+      <div className="hud">
+        <div className="spread">
+          <h3 className="hud-title">Ecosystems</h3>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => edit(null)}>+ New</button>
+        </div>
+        <div className="eco-list">
+          {hub.ecosystems.map((e) => {
+            const pct = e.monthlyTargetCents > 0 ? Math.round((e.monthCents / e.monthlyTargetCents) * 100) : null;
+            return (
+              <button type="button" key={e.id} className={`eco-row${selected === e.id ? " active" : ""}`} onClick={() => onSelect(e.id)}>
+                <span className="eco-dot" style={{ background: e.color }} />
+                <span className="eco-row-main">
+                  <span className="eco-row-name">{e.name} <span className={STATUS_BADGE[e.status]}>{e.status}</span></span>
+                  <span className="muted eco-row-sub">{e.tagline || "—"}</span>
+                  {pct !== null && <XpBar pct={pct} color={e.color} label={`${pct}% of monthly target`} />}
+                </span>
+                <span className="eco-row-money mono">
+                  {fmtUsd(e.monthCents)}
+                  <span className="muted">this month</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="hud">
+        {form ? (
+          <form onSubmit={save}>
+            <h3 className="hud-title">{form.id ? `Edit ${form.name}` : "New ecosystem"}</h3>
+            <div className="form-field"><label>Name</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required maxLength={60} /></div>
+            <div className="form-field"><label>Tagline</label><input value={form.tagline} onChange={(e) => setForm({ ...form, tagline: e.target.value })} maxLength={140} /></div>
+            <div className="row">
+              <div className="form-field" style={{ flex: 1 }}>
+                <label>Status</label>
+                <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                  {ECO_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="form-field"><label>Color</label><input type="color" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} /></div>
+              <div className="form-field" style={{ flex: 1 }}><label>Monthly target ($)</label><input inputMode="decimal" value={form.monthlyTarget} onChange={(e) => setForm({ ...form, monthlyTarget: e.target.value })} placeholder="2000.00" /></div>
+            </div>
+            <div className="form-field"><label>URL</label><input value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://…" /></div>
+            <div className="form-field"><label>Notes (for you and Ray)</label><textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} maxLength={2000} /></div>
+            <div className="row">
+              <button className="btn btn-gold btn-sm" disabled={busy}>{busy ? "Saving…" : "Save"}</button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setForm(null)}>Cancel</button>
+            </div>
+          </form>
+        ) : eco ? (
+          <>
+            <div className="spread">
+              <h3 className="hud-title" style={{ color: eco.color }}>{eco.name}</h3>
+              <div className="row" style={{ gap: 6 }}>
+                {eco.url && <a className="btn btn-ghost btn-sm" href={eco.url} target="_blank" rel="noreferrer">Open ↗</a>}
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => edit(eco)}>Edit</button>
+                <button type="button" className="btn btn-danger btn-sm" onClick={() => del(eco)}>Delete</button>
+              </div>
+            </div>
+            {eco.tagline && <p className="muted" style={{ marginTop: 4 }}>{eco.tagline}</p>}
+            <div className="hud-stats" style={{ marginBottom: 12 }}>
+              <Stat label="This month" value={fmtUsd(eco.monthCents)} sub={eco.monthlyTargetCents ? `target ${fmtUsd(eco.monthlyTargetCents)}` : "no target set"} />
+              <Stat label="Last 30 days" value={fmtUsd(eco.last30Cents)} />
+              <Stat label="Lifetime" value={fmtUsd(eco.lifetimeCents)} sub={eco.lastIncomeOn ? `last ${eco.lastIncomeOn}` : "nothing logged"} />
+            </div>
+            {eco.notes && <div className="scan-text" style={{ marginBottom: 12 }}>{eco.notes}</div>}
+            <Signals metrics={hub.metrics.filter((m) => m.ecosystemId === eco.id)} compact />
+
+            <form onSubmit={addIncome} className="income-form">
+              <strong>Log money</strong>
+              <div className="row">
+                <input inputMode="decimal" placeholder="Amount (−40.00 = expense)" value={income.amount} onChange={(e) => setIncome({ ...income, amount: e.target.value })} required style={{ flex: 1, minWidth: 140 }} />
+                <input type="date" value={income.occurredOn} onChange={(e) => setIncome({ ...income, occurredOn: e.target.value })} />
+              </div>
+              <div className="row">
+                <input placeholder="Source (door, stripe, cash…)" value={income.source} onChange={(e) => setIncome({ ...income, source: e.target.value })} style={{ flex: 1, minWidth: 120 }} maxLength={60} />
+                <input placeholder="Note" value={income.note} onChange={(e) => setIncome({ ...income, note: e.target.value })} style={{ flex: 2, minWidth: 160 }} maxLength={300} />
+                <button className="btn btn-gold btn-sm" disabled={busy}>Add</button>
+              </div>
+            </form>
+          </>
+        ) : (
+          <div className="empty">Pick an ecosystem on the map or in the list.</div>
+        )}
+
+        <h4 className="hud-sub">Recent entries{eco ? ` · ${eco.name}` : ""}</h4>
+        {!entries.length ? (
+          <div className="muted" style={{ fontSize: "0.9rem" }}>Nothing logged yet.</div>
+        ) : (
+          <table className="list hub-table">
+            <tbody>
+              {entries.slice(0, 15).map((i) => (
+                <tr key={i.id}>
+                  <td className="muted mono" style={{ whiteSpace: "nowrap" }}>{i.occurredOn}</td>
+                  <td><span className="eco-dot" style={{ background: i.color, marginRight: 6 }} />{i.ecosystemName}{i.source ? <span className="muted"> · {i.source}</span> : ""}{i.note ? <div className="muted" style={{ fontSize: "0.8rem" }}>{i.note}</div> : null}</td>
+                  <td className={`mono ${i.amountCents < 0 ? "red" : "green"}`} style={{ textAlign: "right", whiteSpace: "nowrap" }}>{i.amountCents < 0 ? "−" : "+"}{fmtUsd(Math.abs(i.amountCents))}</td>
+                  <td>
+                    {i.externalId ? (
+                      <span className="muted" title={`Imported from ${i.source} (${i.externalId}) — re-syncs would bring it back`} style={{ fontSize: "0.8rem" }}>🔒</span>
+                    ) : (
+                      <button type="button" className="link-btn muted" style={{ fontSize: "0.8rem" }} onClick={() => window.confirm("Delete this entry?") && api.hubDeleteIncome(i.id).then(reload).catch((e) => setErr(e.message))}>✕</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Goals ───────────────────────────────────────────────────────────────────
+
+const emptyGoal = { id: null, title: "", detail: "", ecosystemId: "", target: "", progress: "", progressPct: 0, targetDate: "", owner: "both", status: "active" };
+
+function GoalsPanel({ hub, reload, setErr }) {
+  const [form, setForm] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [showDone, setShowDone] = useState(false);
+  const goals = hub.goals.filter((g) => showDone || g.status === "active");
+
+  const edit = (g) =>
+    setForm(
+      g
+        ? { id: g.id, title: g.title, detail: g.detail || "", ecosystemId: g.ecosystemId || "", target: g.targetCents ? centsToUsd(g.targetCents) : "", progress: g.progressCents ? centsToUsd(g.progressCents) : "", progressPct: g.progressPct, targetDate: g.targetDate || "", owner: g.owner, status: g.status }
+        : { ...emptyGoal }
+    );
+
+  async function save(e) {
+    e.preventDefault();
+    setErr("");
+    setBusy(true);
+    try {
+      await api.hubSaveGoal(form);
+      setForm(null);
+      await reload();
+    } catch (e2) {
+      setErr(e2.message);
+    }
+    setBusy(false);
+  }
+
+  async function quick(g, patch) {
+    try {
+      await api.hubSaveGoal({ id: g.id, title: g.title, detail: g.detail, ecosystemId: g.ecosystemId, target: g.targetCents ? centsToUsd(g.targetCents) : "", progress: g.progressCents ? centsToUsd(g.progressCents) : "", progressPct: g.progressPct, targetDate: g.targetDate, owner: g.owner, status: g.status, ...patch });
+      await reload();
+    } catch (e2) {
+      setErr(e2.message);
+    }
+  }
+
+  return (
+    <div className="hub-grid">
+      <div className="hud">
+        <div className="spread">
+          <h3 className="hud-title">Shared goals</h3>
+          <div className="row" style={{ gap: 6 }}>
+            <label className="muted" style={{ fontSize: "0.85rem" }}><input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} /> show finished</label>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => edit(null)}>+ Goal</button>
+          </div>
+        </div>
+        {!goals.length ? (
+          <div className="empty">No goals yet. Set one — Ray reads them.</div>
+        ) : (
+          <div className="stack">
+            {goals.map((g) => {
+              const pct = g.targetCents ? Math.min(100, Math.round((g.progressCents / g.targetCents) * 100)) : g.progressPct;
+              const eco = hub.ecosystems.find((e) => e.id === g.ecosystemId);
+              return (
+                <div key={g.id} className={`goal${g.status !== "active" ? " done" : ""}`}>
+                  <div className="spread">
+                    <div>
+                      <strong>{g.title}</strong>{" "}
+                      <span className="badge">{g.owner === "both" ? "Sol + Ray" : g.owner === "ray" ? "Ray" : "Sol"}</span>
+                      {eco && <span className="badge" style={{ color: eco.color, marginLeft: 4 }}>{eco.name}</span>}
+                      {g.targetDate && <span className="muted" style={{ fontSize: "0.82rem", marginLeft: 6 }}>by {g.targetDate}</span>}
+                    </div>
+                    <div className="row" style={{ gap: 4 }}>
+                      {g.status === "active" && <button type="button" className="btn btn-green btn-sm" onClick={() => quick(g, { status: "done", progressPct: 100 })}>Done ✓</button>}
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => edit(g)}>Edit</button>
+                    </div>
+                  </div>
+                  {g.detail && <p className="muted" style={{ margin: "4px 0", fontSize: "0.9rem" }}>{g.detail}</p>}
+                  <div className="row" style={{ gap: 10 }}>
+                    <XpBar pct={pct} color={eco?.color || "var(--gold)"} label={`${pct}%`} />
+                    <span className="mono" style={{ fontSize: "0.85rem", minWidth: 120, textAlign: "right" }}>
+                      {g.targetCents ? `${fmtUsd(g.progressCents)} / ${fmtUsd(g.targetCents)}` : `${pct}%`}
+                    </span>
+                  </div>
+                  {g.rayNote && (
+                    <div className="ray-inline">
+                      <span className="ray-tag">Ray</span> {g.rayNote}
+                      {g.rayNoteAt && <span className="muted"> · {new Date(g.rayNoteAt).toLocaleDateString()}</span>}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      <div className="hud">
+        {form ? (
+          <form onSubmit={save}>
+            <h3 className="hud-title">{form.id ? "Edit goal" : "New goal"}</h3>
+            <div className="form-field"><label>Title</label><input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required maxLength={140} /></div>
+            <div className="form-field"><label>Detail</label><textarea rows={3} value={form.detail} onChange={(e) => setForm({ ...form, detail: e.target.value })} maxLength={2000} /></div>
+            <div className="row">
+              <div className="form-field" style={{ flex: 1 }}>
+                <label>Ecosystem</label>
+                <select value={form.ecosystemId} onChange={(e) => setForm({ ...form, ecosystemId: e.target.value })}>
+                  <option value="">— none —</option>
+                  {hub.ecosystems.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+                </select>
+              </div>
+              <div className="form-field" style={{ flex: 1 }}>
+                <label>Owner</label>
+                <select value={form.owner} onChange={(e) => setForm({ ...form, owner: e.target.value })}>
+                  <option value="both">Sol + Ray</option><option value="sol">Sol</option><option value="ray">Ray</option>
+                </select>
+              </div>
+            </div>
+            <div className="row">
+              <div className="form-field" style={{ flex: 1 }}><label>Money target ($)</label><input inputMode="decimal" value={form.target} onChange={(e) => setForm({ ...form, target: e.target.value })} placeholder="optional" /></div>
+              <div className="form-field" style={{ flex: 1 }}><label>Progress ($)</label><input inputMode="decimal" value={form.progress} onChange={(e) => setForm({ ...form, progress: e.target.value })} placeholder="0.00" /></div>
+              <div className="form-field" style={{ flex: 1 }}><label>Progress %</label><input type="number" min={0} max={100} value={form.progressPct} onChange={(e) => setForm({ ...form, progressPct: e.target.value })} /></div>
+            </div>
+            <div className="row">
+              <div className="form-field" style={{ flex: 1 }}><label>Target date</label><input type="date" value={form.targetDate} onChange={(e) => setForm({ ...form, targetDate: e.target.value })} /></div>
+              <div className="form-field" style={{ flex: 1 }}>
+                <label>Status</label>
+                <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                  <option value="active">active</option><option value="done">done</option><option value="dropped">dropped</option>
+                </select>
+              </div>
+            </div>
+            <div className="row">
+              <button className="btn btn-gold btn-sm" disabled={busy}>{busy ? "Saving…" : "Save goal"}</button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setForm(null)}>Cancel</button>
+              {form.id && <button type="button" className="btn btn-danger btn-sm" onClick={() => window.confirm("Delete this goal?") && api.hubDeleteGoal(form.id).then(() => { setForm(null); reload(); }).catch((e) => setErr(e.message))}>Delete</button>}
+            </div>
+          </form>
+        ) : (
+          <>
+            <h3 className="hud-title">How this works</h3>
+            <p className="muted" style={{ fontSize: "0.92rem" }}>
+              Goals live here for both of you. Ray reads them (with the ecosystem numbers) on its daily pass, leaves a note on each one, and can nudge the percent. Money goals fill from the dollar progress you log; everything else uses the percent.
+            </p>
+            <p className="muted" style={{ fontSize: "0.92rem" }}>Ray never changes money, statuses, or anything a member sees. You keep the pen.</p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Ray's notes ─────────────────────────────────────────────────────────────
+
+function RayPanel({ hub, reload, setErr }) {
+  const notes = hub.notes;
+  const unread = notes.filter((n) => !n.readAt).length;
+  async function act(payload) {
+    try {
+      await api.hubNoteAction(payload);
+      await reload();
     } catch (e) {
       setErr(e.message);
     }
   }
+  return (
+    <div className="hud ray-hud">
+      <div className="spread">
+        <h3 className="hud-title"><span className="ray-orb" /> Ray</h3>
+        <div className="row" style={{ gap: 6 }}>
+          {unread > 0 && <span className="badge badge-cyan">{unread} new</span>}
+          {unread > 0 && <button type="button" className="btn btn-ghost btn-sm" onClick={() => act({ action: "read_all" })}>Mark all read</button>}
+        </div>
+      </div>
+      {!notes.length ? (
+        <div className="empty">
+          Nothing from Ray yet. Ray's daily pass reads the hub and leaves a briefing here once the shared token is set.
+        </div>
+      ) : (
+        <div className="stack">
+          {notes.map((n) => (
+            <div key={n.id} className={`ray-note${n.readAt ? "" : " unread"} kind-${n.kind}`} onClick={() => !n.readAt && act({ id: n.id, action: "read" })}>
+              <div className="spread">
+                <strong>{NOTE_ICON[n.kind] || "•"} {n.title}</strong>
+                <span className="muted" style={{ fontSize: "0.8rem" }}>
+                  {new Date(n.createdAt).toLocaleString()}{n.model ? ` · ${n.model}` : ""}
+                </span>
+              </div>
+              <p style={{ margin: "6px 0 4px", whiteSpace: "pre-wrap" }}>{n.body}</p>
+              <div className="row" style={{ gap: 6 }}>
+                {n.ecosystemName && <span className="badge">{n.ecosystemName}</span>}
+                {n.goalTitle && <span className="badge">goal: {n.goalTitle}</span>}
+                <button type="button" className="link-btn muted" style={{ fontSize: "0.8rem", marginLeft: "auto" }} onClick={(e) => { e.stopPropagation(); act({ id: n.id, action: "dismiss" }); }}>dismiss</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── The page ────────────────────────────────────────────────────────────────
+
+const TABS = [
+  ["overview", "☀️ Overview"],
+  ["ecosystems", "🪐 Ecosystems"],
+  ["goals", "🎯 Goals"],
+  ["ray", "🤖 Ray"],
+  ["ops", "🛠 Ops"],
+];
+
+export default function SuperAdmin() {
+  usePageMeta({ title: "Command Center" });
+  const { me } = useMe();
+  const [tab, setTab] = useState("overview");
+  const [hub, setHub] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const [err, setErr] = useState("");
+
+  const reload = () => api.hub().then(setHub).catch((e) => setErr(e.message));
+  useEffect(() => {
+    reload();
+  }, []);
+
+  const lvl = useMemo(() => levelFor(hub?.totals?.lifetimeCents || 0), [hub]);
+  const unread = hub?.notes?.filter((n) => !n.readAt).length || 0;
 
   if (me && !me.isSuperAdmin) {
     return (
@@ -53,390 +499,68 @@ export default function SuperAdmin() {
   }
 
   return (
-    <div className="page">
-      <h1>Super admin</h1>
+    <div className="page hub">
+      <div className="hub-head">
+        <div>
+          <div className="lp-eyebrow">Command center</div>
+          <h1 style={{ margin: 0 }}>Welcome home, Sol.</h1>
+        </div>
+        <div className="level-card">
+          <div className="level-num">LV {lvl.level}</div>
+          <div style={{ flex: 1 }}>
+            <XpBar pct={lvl.pct} color="linear-gradient(90deg, var(--ember), var(--gold))" label="XP" />
+            <div className="muted" style={{ fontSize: "0.78rem", marginTop: 4 }}>
+              {hub ? `${fmtUsd(hub.totals.lifetimeCents)} lifetime · next level at $${lvl.next.toLocaleString()}` : "…"}
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="tabs">
-        {["admins", "activity", "rails"].map((t) => (
-          <button key={t} className={`tab${tab === t ? " active" : ""}`} onClick={() => setTab(t)}>
-            {t === "admins" ? "👥 Admins" : t === "activity" ? "📜 Activity" : "💸 Payment rails"}
+        {TABS.map(([k, label]) => (
+          <button key={k} className={`tab${tab === k ? " active" : ""}`} onClick={() => setTab(k)}>
+            {label}
+            {k === "ray" && unread > 0 && <span className="tab-badge">{unread}</span>}
           </button>
         ))}
       </div>
       {err && <div className="form-result error">{err}</div>}
 
-      {tab === "admins" && (
+      {!hub ? (
+        <div className="spinner">Powering up…</div>
+      ) : (
         <>
-          <div className="card" style={{ marginBottom: 16 }}>
-            <h3>Current admins</h3>
-            {!data ? (
-              <div className="spinner">Loading…</div>
-            ) : (
-              <div className="table-wrap">
-                <table className="list">
-                  <thead>
-                    <tr>
-                      <th>Who</th>
-                      <th>Role</th>
-                      <th>Last login</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.admins.map((a) => (
-                      <tr key={a.id}>
-                        <td>
-                          <strong>{a.name || "—"}</strong>
-                          <br />
-                          <span className="muted">{a.email}</span>
-                        </td>
-                        <td>
-                          {a.isSuperAdmin ? (
-                            <span className="badge badge-gold">super admin</span>
-                          ) : (
-                            <span className="badge badge-green">admin</span>
-                          )}
-                        </td>
-                        <td className="muted">
-                          {a.lastLoginAt ? new Date(a.lastLoginAt).toLocaleString() : "—"}
-                        </td>
-                        <td>
-                          {!a.isSuperAdmin && (
-                            <button className="btn btn-danger btn-sm" onClick={() => setFlag(a.id, false)}>
-                              Revoke
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          {tab === "overview" && (
+            <>
+              <div className="hud-stats">
+                <Stat label="This month" value={fmtUsd(hub.totals.monthCents)} tone="gold" sub={hub.totals.targetCents ? `${Math.round((hub.totals.monthCents / hub.totals.targetCents) * 100)}% of ${fmtUsd(hub.totals.targetCents)}` : "set monthly targets"} />
+                <Stat label="Last 30 days" value={fmtUsd(hub.totals.last30Cents)} />
+                <Stat label="Owed to you" value={fmtUsd(hub.stats.owedToSolCents)} tone="green" sub="members' open balances" />
+                <Stat label="You owe" value={fmtUsd(hub.stats.solOwesCents)} tone={hub.stats.solOwesCents ? "red" : ""} sub={`${hub.stats.reimbSubmitted} to approve · ${hub.stats.reimbApproved} to pay`} />
+                <Stat label="Members" value={hub.stats.members} sub={`${hub.stats.applied} applied · ${hub.stats.waitlistNew} on the waitlist`} />
+                <Stat label="Scanner" value={hub.stats.receiptsScanning} sub="receipts in Ray's queue" />
               </div>
-            )}
-          </div>
-
-          <div className="card">
-            <h3>Promote someone</h3>
-            <form
-              className="row"
-              onSubmit={(e) => {
-                e.preventDefault();
-                load(search);
-              }}
-            >
-              <input
-                style={{ flex: 1, minWidth: 200 }}
-                placeholder="Search by email or name…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <button className="btn btn-ghost btn-sm">Search</button>
-            </form>
-            {data?.matches?.length > 0 && (
-              <div className="table-wrap" style={{ marginTop: 12 }}>
-                <table className="list">
-                  <tbody>
-                    {data.matches.map((u) => (
-                      <tr key={u.id}>
-                        <td>
-                          <strong>{u.name || "—"}</strong>
-                          <br />
-                          <span className="muted">{u.email}</span>
-                        </td>
-                        <td>
-                          {u.isSuperAdmin ? (
-                            <span className="badge badge-gold">super admin</span>
-                          ) : u.isAdmin ? (
-                            <span className="badge badge-green">admin</span>
-                          ) : (
-                            <span className="badge">member</span>
-                          )}
-                        </td>
-                        <td>
-                          {!u.isAdmin && !u.isSuperAdmin && (
-                            <button className="btn btn-green btn-sm" onClick={() => setFlag(u.id, true)}>
-                              Make admin
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              {hub.metrics.length > 0 && (
+                <div className="hud" style={{ marginBottom: 14 }}>
+                  <h3 className="hud-title">Live signals</h3>
+                  <Signals metrics={hub.metrics} />
+                </div>
+              )}
+              <div className="hub-grid overview">
+                <div className="hud map-hud">
+                  <SolarMap ecosystems={hub.ecosystems} selectedId={selected} onSelect={(e) => { setSelected(e.id); setTab("ecosystems"); }} />
+                  <p className="muted map-caption">The sun powers every tendril. POUND was the first; more to come.</p>
+                </div>
+                <RayPanel hub={{ ...hub, notes: hub.notes.slice(0, 5) }} reload={reload} setErr={setErr} />
               </div>
-            )}
-          </div>
+            </>
+          )}
+          {tab === "ecosystems" && <EcosystemPanel hub={hub} selected={selected} onSelect={setSelected} reload={reload} setErr={setErr} />}
+          {tab === "goals" && <GoalsPanel hub={hub} reload={reload} setErr={setErr} />}
+          {tab === "ray" && <RayPanel hub={hub} reload={reload} setErr={setErr} />}
+          {tab === "ops" && <SuperAdminOps />}
         </>
       )}
-
-      {tab === "activity" &&
-        (activity === null ? (
-          <div className="spinner">Loading…</div>
-        ) : !activity.length ? (
-          <div className="empty">No admin activity yet.</div>
-        ) : (
-          <div className="table-wrap">
-            <table className="list">
-              <thead>
-                <tr>
-                  <th>When</th>
-                  <th>Who</th>
-                  <th>Action</th>
-                  <th>Detail</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activity.map((a) => (
-                  <tr key={a.id}>
-                    <td className="muted">{new Date(a.createdAt).toLocaleString()}</td>
-                    <td>{a.actorEmail}</td>
-                    <td>
-                      <span className="badge">{a.action}</span>
-                    </td>
-                    <td className="muted mono" style={{ fontSize: "0.78rem", maxWidth: 280, overflowWrap: "anywhere" }}>
-                      {a.detail || "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ))}
-
-      {tab === "rails" && <RailsTab rails={rails} setRails={setRails} setErr={setErr} />}
     </div>
-  );
-}
-
-// ── Payment rails: the PUBLIC receiving addresses members pay crypto to ──
-
-const CHAINS = ["XRP", "SOL", "BTC", "TON"];
-const emptyRail = { id: null, chain: "XRP", address: "", tag: "", label: "", active: true };
-
-function RailsTab({ rails, setRails, setErr }) {
-  const [form, setForm] = useState(emptyRail);
-  const [busy, setBusy] = useState(false);
-  const [copiedId, setCopiedId] = useState(null);
-
-  const reload = () =>
-    api
-      .rails()
-      .then((d) => setRails(d.rails || []))
-      .catch((e) => setErr(e.message));
-
-  async function act(fn) {
-    setErr("");
-    try {
-      await fn();
-      await reload();
-      return true;
-    } catch (e) {
-      setErr(e.message);
-      return false;
-    }
-  }
-
-  async function save(e) {
-    e.preventDefault();
-    setBusy(true);
-    const ok = await act(() =>
-      api.saveRail({
-        ...(form.id ? { id: form.id } : {}),
-        chain: form.chain,
-        address: form.address.trim(),
-        tag: form.tag.trim() || undefined,
-        label: form.label.trim() || undefined,
-        active: form.active,
-      })
-    );
-    if (ok) setForm(emptyRail);
-    setBusy(false);
-  }
-
-  function copyAddress(rail) {
-    navigator.clipboard.writeText(rail.address).then(() => {
-      setCopiedId(rail.id);
-      setTimeout(() => setCopiedId(null), 1600);
-    });
-  }
-
-  return (
-    <>
-      <div className="card" style={{ marginBottom: 16 }}>
-        <h3>Receiving addresses</h3>
-        <p className="hint" style={{ marginTop: 0 }}>
-          PUBLIC receiving addresses only — never paste anything that looks like a key or seed.
-        </p>
-        {rails === null ? (
-          <div className="spinner">Loading…</div>
-        ) : !rails.length ? (
-          <div className="empty">No payment rails yet — add one below.</div>
-        ) : (
-          <div className="table-wrap">
-            <table className="list">
-              <thead>
-                <tr>
-                  <th>Chain</th>
-                  <th>Address</th>
-                  <th>Tag / memo</th>
-                  <th>Label</th>
-                  <th>Active</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {rails.map((r) => (
-                  <tr key={r.id}>
-                    <td>
-                      <span className="badge badge-gold">{r.chain}</span>
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="copy-btn"
-                        style={{ maxWidth: 260 }}
-                        title="Copy address"
-                        onClick={() => copyAddress(r)}
-                      >
-                        {r.address}
-                      </button>
-                      {copiedId === r.id && <span className="hint green">Copied ✓</span>}
-                    </td>
-                    <td className="mono muted">{r.tag || "—"}</td>
-                    <td className="muted">{r.label || "—"}</td>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={!!r.active}
-                        aria-label={`${r.chain} rail active`}
-                        onChange={() =>
-                          act(() =>
-                            api.saveRail({
-                              id: r.id,
-                              chain: r.chain,
-                              address: r.address,
-                              tag: r.tag || undefined,
-                              label: r.label || undefined,
-                              active: !r.active,
-                            })
-                          )
-                        }
-                      />
-                    </td>
-                    <td>
-                      <div className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          onClick={() =>
-                            setForm({
-                              id: r.id,
-                              chain: r.chain,
-                              address: r.address,
-                              tag: r.tag || "",
-                              label: r.label || "",
-                              active: !!r.active,
-                            })
-                          }
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="btn btn-danger btn-sm"
-                          onClick={() =>
-                            window.confirm(`Delete the ${r.chain} rail? Members won't see it anymore.`) &&
-                            act(() => api.deleteRail(r.id))
-                          }
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      <div className="card">
-        <h3>{form.id ? "Edit rail" : "Add a rail"}</h3>
-        <form onSubmit={save}>
-          <div className="row" style={{ alignItems: "flex-end" }}>
-            <div className="form-field" style={{ minWidth: 110, marginBottom: 10 }}>
-              <label>Chain</label>
-              <select
-                value={form.chain}
-                onChange={(e) => setForm({ ...form, chain: e.target.value })}
-              >
-                {CHAINS.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-field" style={{ flex: 2, minWidth: 220, marginBottom: 10 }}>
-              <label>
-                Public address <span className="req">*</span>
-              </label>
-              <input
-                className="mono"
-                value={form.address}
-                onChange={(e) => setForm({ ...form, address: e.target.value })}
-                placeholder="Receiving address (public)"
-                required
-              />
-            </div>
-          </div>
-          <div className="row" style={{ alignItems: "flex-end" }}>
-            <div className="form-field" style={{ flex: 1, minWidth: 140, marginBottom: 10 }}>
-              <label>Destination tag / memo</label>
-              <input
-                className="mono"
-                value={form.tag}
-                onChange={(e) => setForm({ ...form, tag: e.target.value })}
-                placeholder="XRP tag / TON memo"
-              />
-            </div>
-            <div className="form-field" style={{ flex: 1, minWidth: 140, marginBottom: 10 }}>
-              <label>Label</label>
-              <input
-                value={form.label}
-                onChange={(e) => setForm({ ...form, label: e.target.value })}
-                placeholder="e.g. Main vault"
-              />
-            </div>
-            <div className="form-field" style={{ marginBottom: 10 }}>
-              <label style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={form.active}
-                  onChange={(e) => setForm({ ...form, active: e.target.checked })}
-                />
-                Active
-              </label>
-            </div>
-          </div>
-          <div className="row">
-            <button className="btn btn-gold" disabled={busy}>
-              {busy ? "Saving…" : form.id ? "Save rail" : "Add rail"}
-            </button>
-            {form.id && (
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                disabled={busy}
-                onClick={() => setForm(emptyRail)}
-              >
-                Cancel edit
-              </button>
-            )}
-          </div>
-          <span className="hint">
-            PUBLIC receiving addresses only — never paste anything that looks like a key or seed.
-          </span>
-        </form>
-      </div>
-    </>
   );
 }

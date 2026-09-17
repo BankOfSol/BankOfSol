@@ -42,7 +42,9 @@ npm run deploy:mailer              # deploy workers/mailer (needed on email/dige
 3. **Every route calls its gate explicitly** (`functions/lib/util.js`), server-side.
    Admin mutations call `logAdminActivity`. Owner-scoped misses return 404, not 403.
 4. **Shop checkout/confirm are public on purpose** (guest checkout; the Stripe `cs_…`
-   id is the authorization). Don't add auth to them.
+   id is the authorization). Don't add auth to them. (Since 2026-09-17 the shop is
+   unlinked from the SPA — the public site is sun + waitlist + login — but the
+   routes still exist; see ARCHITECTURE §4 "orphaned server routes".)
 5. **Email only via `functions/lib/email.js`** — never throws, always logs to
    `email_log` (subjects + outcomes only, never bodies/links).
 6. **Demo account numbers only from `DEMO_ACCOUNT`** in `DemoAccountPreview.jsx` (no
