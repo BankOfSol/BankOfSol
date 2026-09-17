@@ -11,8 +11,14 @@ next session has to rediscover. (Discipline inherited from PoundPlay, which prov
   `dist/`) as static assets, plus the `/api/*` backend — Pages-Functions-style files in
   `functions/api/*` compiled by `wrangler pages functions build --outdir=./dist/_worker.js/`
   (see `package.json` build). Bindings live in `wrangler.jsonc`, NOT a dashboard.
-- **Deploys are explicit**: `npm run deploy` (build + `wrangler deploy`). `git push` is
-  backup, not release. The mailer Worker deploys separately: `npm run deploy:mailer` —
+- **Deploys (since 2026-09-17): git-connected Workers Builds.** A push to `main` on
+  github.com/BankOfSol/BankOfSol runs `npm run build` then `npx wrangler deploy` on
+  Cloudflare's build machine (Workers & Pages → bankofsol → Builds). `.npmrc` sets
+  `legacy-peer-deps=true` because the build runs `npm clean-install`, which otherwise
+  refuses the kysely peer conflict (Better Auth 1.6.23 vs kysely-d1). `npm run deploy`
+  still works as a manual release. ⚠️ **Migrations do NOT ride the build** — run
+  `npm run db:migrate` BEFORE pushing code that needs a new table (the THE LOT lesson from
+  PoundPlay: code ahead of schema = 500s). The mailer Worker deploys separately: `npm run deploy:mailer` —
   required whenever `workers/mailer/*` or anything it imports
   (`functions/lib/email.js`, `functions/lib/digest.js`) changes. **Deploy the mailer
   first on a fresh account** — the main Worker's `EMAIL` service binding needs its
@@ -265,6 +271,10 @@ Solana Pay merchant checkout (raw JSON-RPC, no SDK). Full plan:
 
 ## Changelog
 
+- **2026-09-17 (night)** — **Git-connected builds.** Sol connected the GitHub repo to Workers
+  Builds; the first build failed on `npm clean-install` (kysely peer conflict). Added
+  `.npmrc` (`legacy-peer-deps=true`), verified `npm ci` passes with it. Deploy model
+  updated in §1; migrations still run by hand, first.
 - **2026-09-17 (evening)** — **The hub listens: Stripe, poundplay stats, chain explorers,
   Cloudflare Analytics.** All pulled by Ray (`AGENTS/Ray/ray/hubsync.py`, hourly, outbound
   only) and posted through `/api/ray/hub` (income idempotent on source+externalId; metrics
